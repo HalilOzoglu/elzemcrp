@@ -28,6 +28,7 @@ interface DeviceEditDialogProps {
     has_invoice: boolean
     warranty_months: number
     barcode: string | null
+    battery_health: number | null
   }
 }
 
@@ -132,12 +133,21 @@ export function DeviceEditDialog({ deviceId, device }: DeviceEditDialogProps) {
             <CheckboxField id="de_is_foreign" name="is_foreign" label="Yabancı menşei" checked={isForeign} onChange={setIsForeign} />
             <CheckboxField id="de_has_box" name="has_box" label="Kutu var" checked={hasBox} onChange={setHasBox} />
             <CheckboxField id="de_has_invoice" name="has_invoice" label="Fatura var" checked={hasInvoice} onChange={setHasInvoice} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="de_warranty_months">Garanti (ay)</Label>
                 <Input
                   id="de_warranty_months" name="warranty_months" type="number" min="0"
                   value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="de_battery_health">Pil Durumu (%)</Label>
+                <Input
+                  id="de_battery_health" name="battery_health" type="number" min="0" max="100"
+                  placeholder={isNew ? "100 (otomatik)" : "0-100"}
+                  disabled={isNew}
+                  defaultValue={device.battery_health ?? ""}
                 />
               </div>
               <div className="space-y-1">

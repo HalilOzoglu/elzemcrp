@@ -114,6 +114,7 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
               has_invoice: device.has_invoice,
               warranty_months: device.warranty_months,
               barcode: device.barcode,
+              battery_health: device.battery_health ?? null,
             }}
           />
         </div>
@@ -135,6 +136,7 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
           <div><span className="text-muted-foreground">Fatura:</span> <span className="font-medium">{device.has_invoice ? "Var" : "Yok"}</span></div>
           <div><span className="text-muted-foreground">Garanti:</span> <span className="font-medium">{device.warranty_months} ay</span></div>
           <div><span className="text-muted-foreground">Barkod:</span> <span className="font-mono font-medium">{device.barcode ?? "—"}</span></div>
+          <div><span className="text-muted-foreground">Pil Durumu:</span> <span className="font-medium">{device.battery_health != null ? `${device.battery_health}%` : "—"}</span></div>
           <div><span className="text-muted-foreground">Durum:</span> <span className="font-medium">{STATUS_LABELS[device.status] ?? device.status}</span></div>
         </div>
       </section>

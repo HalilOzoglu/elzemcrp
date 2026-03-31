@@ -185,12 +185,21 @@ function AddDeviceDialog({ open, onOpenChange, brands, models, onAdd, error }: A
           <CheckboxField id="add_is_foreign" name="is_foreign" label="Yabancı menşei" checked={isForeign} onChange={setIsForeign} />
           <CheckboxField id="add_has_box" name="has_box" label="Kutu var" checked={hasBox} onChange={setHasBox} />
           <CheckboxField id="add_has_invoice" name="has_invoice" label="Fatura var" checked={hasInvoice} onChange={setHasInvoice} />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label htmlFor="add_warranty_months">Garanti (ay)</Label>
               <Input
                 id="add_warranty_months" name="warranty_months" type="number" min="0"
                 value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="add_battery_health">Pil Durumu (%)</Label>
+              <Input
+                id="add_battery_health" name="battery_health" type="number" min="0" max="100"
+                placeholder={isNew ? "100 (otomatik)" : "0-100"}
+                disabled={isNew}
+                defaultValue={isNew ? "100" : ""}
               />
             </div>
             <div className="space-y-1">
@@ -227,16 +236,15 @@ function EditDeviceDialog({ device, open, onOpenChange, onSave, error }: EditDia
   const [hasInvoice, setHasInvoice] = useState(false)
   const [warrantyMonths, setWarrantyMonths] = useState("0")
 
-  const [lastDeviceId, setLastDeviceId] = useState<string | null>(null)
-  if (device && device.device_id !== lastDeviceId) {
-    setLastDeviceId(device.device_id)
+  useEffect(() => {
+    if (!device) return
+    setIsDualSim(device.is_dual_sim)
     setIsNew(device.is_new)
     setIsForeign(device.is_foreign)
-    setIsDualSim(false)
-    setHasBox(false)
-    setHasInvoice(false)
-    setWarrantyMonths(device.is_new ? "24" : "0")
-  }
+    setHasBox(device.has_box)
+    setHasInvoice(device.has_invoice)
+    setWarrantyMonths(String(device.warranty_months ?? 0))
+  }, [device?.device_id])
 
   function handleIsNewChange(v: boolean) {
     setIsNew(v)
@@ -279,14 +287,14 @@ function EditDeviceDialog({ device, open, onOpenChange, onSave, error }: EditDia
           {isDualSim && (
             <div className="space-y-1">
               <Label htmlFor="edit_imei_2">IMEI 2 *</Label>
-              <Input id="edit_imei_2" name="imei_2" placeholder="15 haneli IMEI (zorunlu)" maxLength={15} required />
+              <Input id="edit_imei_2" name="imei_2" defaultValue={device.imei_2 ?? ""} placeholder="15 haneli IMEI (zorunlu)" maxLength={15} required />
             </div>
           )}
           <CheckboxField id="edit_is_new" name="is_new" label="Sıfır cihaz" checked={isNew} onChange={handleIsNewChange} />
           <CheckboxField id="edit_is_foreign" name="is_foreign" label="Yabancı menşei" checked={isForeign} onChange={setIsForeign} />
           <CheckboxField id="edit_has_box" name="has_box" label="Kutu var" checked={hasBox} onChange={setHasBox} />
           <CheckboxField id="edit_has_invoice" name="has_invoice" label="Fatura var" checked={hasInvoice} onChange={setHasInvoice} />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label htmlFor="edit_warranty_months">Garanti (ay)</Label>
               <Input
@@ -295,8 +303,17 @@ function EditDeviceDialog({ device, open, onOpenChange, onSave, error }: EditDia
               />
             </div>
             <div className="space-y-1">
+              <Label htmlFor="edit_battery_health">Pil Durumu (%)</Label>
+              <Input
+                id="edit_battery_health" name="battery_health" type="number" min="0" max="100"
+                placeholder={isNew ? "100 (otomatik)" : "0-100"}
+                disabled={isNew}
+                defaultValue={device.battery_health ?? ""}
+              />
+            </div>
+            <div className="space-y-1">
               <Label htmlFor="edit_barcode">Barkod</Label>
-              <Input id="edit_barcode" name="barcode" placeholder="Opsiyonel" />
+              <Input id="edit_barcode" name="barcode" defaultValue={device.barcode ?? ""} placeholder="Opsiyonel" />
             </div>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -318,8 +335,14 @@ export function DevicesClient({ devices, brands, models }: DevicesClientProps) {
 
   const [optimisticDevices, dispatchOptimistic] = useOptimistic(
     devices,
-    (state: InStockDevice[], action: { type: "add"; item: InStockDevice }) => {
+    (state: InStockDevice[], action:
+      | { type: "add"; item: InStockDevice }
+      | { type: "update"; item: Partial<InStockDevice> & { device_id: string } }
+    ) => {
       if (action.type === "add") return [action.item, ...state]
+      if (action.type === "update") return state.map(d =>
+        d.device_id === action.item.device_id ? { ...d, ...action.item } : d
+      )
       return state
     }
   )
@@ -358,8 +381,16 @@ export function DevicesClient({ devices, brands, models }: DevicesClientProps) {
       color: (formData.get("color") as string) ?? "",
       storage: (formData.get("storage") as string) ?? "",
       imei_1: (formData.get("imei_1") as string) || null,
+      imei_2: (formData.get("imei_2") as string) || null,
       is_new: formData.get("is_new") === "true",
       is_foreign: formData.get("is_foreign") === "true",
+      is_dual_sim: formData.get("is_dual_sim") === "true",
+      has_box: formData.get("has_box") === "true",
+      has_invoice: formData.get("has_invoice") === "true",
+      warranty_months: parseInt(formData.get("warranty_months") as string) || 0,
+      barcode: (formData.get("barcode") as string) || null,
+      battery_health: formData.get("is_new") === "true" ? 100 : (parseInt(formData.get("battery_health") as string) || null),
+      status: "IN_STOCK",
       purchase_price: parseFloat(formData.get("purchase_price") as string) || 0,
       total_expenses: 0,
       net_cost_to_us: parseFloat(formData.get("purchase_price") as string) || 0,
@@ -384,6 +415,20 @@ export function DevicesClient({ devices, brands, models }: DevicesClientProps) {
 
   async function handleEdit(deviceId: string, formData: FormData) {
     setEditError(null)
+    startTransition(() => {
+      dispatchOptimistic({
+        type: "update",
+        item: {
+          device_id: deviceId,
+          purchase_price: parseFloat(formData.get("purchase_price") as string) || 0,
+          recommended_sale_price: formData.get("recommended_sale_price")
+            ? parseFloat(formData.get("recommended_sale_price") as string)
+            : null,
+          is_new: formData.get("is_new") === "true",
+          is_foreign: formData.get("is_foreign") === "true",
+        }
+      })
+    })
     const result = await updateDevice(deviceId, formData)
     if ("error" in result) {
       setEditError(result.error)

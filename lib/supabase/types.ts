@@ -43,6 +43,7 @@ export interface Device {
   recommended_sale_price: number | null
   purchase_date: string
   status: DeviceStatus
+  battery_health: number | null
   created_at: string
 }
 
@@ -117,8 +118,17 @@ export interface InStockDevice {
   color: string
   storage: string
   imei_1: string | null
+  imei_2: string | null
   is_new: boolean
   is_foreign: boolean
+  is_dual_sim: boolean
+  has_box: boolean
+  has_invoice: boolean
+  warranty_months: number
+  barcode: string | null
+  battery_health: number | null
+  status: DeviceStatus
+  battery_health: number | null
   purchase_price: number
   total_expenses: number
   net_cost_to_us: number

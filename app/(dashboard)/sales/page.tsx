@@ -42,8 +42,17 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       invoice_type,
       customer_id,
       device_id,
-      contacts ( full_name ),
-      devices ( id, model_variants ( model_id, models ( name, brands ( name ) ) ) )
+      contacts:customer_id ( full_name ),
+      devices:device_id (
+        id,
+        model_variants:variant_id (
+          color, storage,
+          models:model_id (
+            name,
+            brands:brand_id ( name )
+          )
+        )
+      )
     `
     )
     .order("sale_date", { ascending: false })
@@ -52,7 +61,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     query = query.gte("sale_date", from)
   }
   if (to) {
-    query = query.lte("sale_date", `${to}T23:59:59`)
+    query = query.lte("sale_date", to)
   }
   if (payment === "CASH" || payment === "CREDIT_CARD" || payment === "IBAN") {
     query = query.eq("payment_method", payment)
@@ -69,7 +78,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     if (row.device_id && row.devices) {
       const brand = row.devices?.model_variants?.models?.brands?.name ?? ""
       const model = row.devices?.model_variants?.models?.name ?? ""
-      productName = [brand, model].filter(Boolean).join(" ") || "Cihaz"
+      const color = row.devices?.model_variants?.color ?? ""
+      const storage = row.devices?.model_variants?.storage ?? ""
+      productName = [brand, model, color, storage].filter(Boolean).join(" ") || "Cihaz"
     }
 
     return {

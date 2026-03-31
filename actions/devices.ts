@@ -84,6 +84,11 @@ const addDeviceSchema = z
       .transform((v) => (v && v.trim() !== "" ? parseInt(v, 10) : 0))
       .refine((v) => !isNaN(v) && v >= 0, "Geçerli bir garanti süresi girin"),
     barcode: z.string().optional().transform((v) => (v && v.trim() !== "" ? v.trim() : null)),
+    battery_health: z
+      .string()
+      .optional()
+      .transform((v) => (v && v.trim() !== "" ? parseInt(v, 10) : null))
+      .refine((v) => v === null || (!isNaN(v) && v >= 0 && v <= 100), "Pil durumu 0-100 arasında olmalıdır"),
   })
   .superRefine((data, ctx) => {
     validateImeis(data.imei1 ?? null, data.imei2 ?? null, data.is_dual_sim, ctx)
@@ -116,6 +121,11 @@ const updateDeviceSchema = z
       .transform((v) => (v && v.trim() !== "" ? parseInt(v, 10) : 0))
       .refine((v) => !isNaN(v) && v >= 0, "Geçerli bir garanti süresi girin"),
     barcode: z.string().optional().transform((v) => (v && v.trim() !== "" ? v.trim() : null)),
+    battery_health: z
+      .string()
+      .optional()
+      .transform((v) => (v && v.trim() !== "" ? parseInt(v, 10) : null))
+      .refine((v) => v === null || (!isNaN(v) && v >= 0 && v <= 100), "Pil durumu 0-100 arasında olmalıdır"),
   })
   .superRefine((data, ctx) => {
     validateImeis(data.imei_1 ?? null, data.imei_2 ?? null, data.is_dual_sim, ctx)
@@ -140,6 +150,7 @@ export async function addDevice(formData: FormData): Promise<ActionResult> {
     has_invoice: formData.get("has_invoice") === "true",
     warranty_months: (formData.get("warranty_months") as string) ?? "",
     barcode: (formData.get("barcode") as string) ?? "",
+    battery_health: (formData.get("battery_health") as string) ?? "",
   }
 
   const parsed = addDeviceSchema.safeParse(raw)
@@ -168,6 +179,9 @@ export async function addDevice(formData: FormData): Promise<ActionResult> {
   if (is_new && warranty_months === 0) {
     warranty_months = 24
   }
+
+  // Sıfır cihazda pil durumu otomatik 100
+  const battery_health = is_new ? 100 : (parsed.data.battery_health ?? null)
 
   const supabase = await createClient()
 
@@ -211,6 +225,7 @@ export async function addDevice(formData: FormData): Promise<ActionResult> {
     has_invoice,
     warranty_months,
     barcode: barcode ?? `DEV-${Date.now()}`,
+    battery_health,
     status: "IN_STOCK",
   })
 
@@ -243,6 +258,7 @@ export async function updateDevice(
     has_invoice: formData.get("has_invoice") === "true",
     warranty_months: (formData.get("warranty_months") as string) ?? "",
     barcode: (formData.get("barcode") as string) ?? "",
+    battery_health: (formData.get("battery_health") as string) ?? "",
   }
 
   const parsed = updateDeviceSchema.safeParse(raw)
@@ -255,6 +271,9 @@ export async function updateDevice(
   if (parsed.data.is_new && warranty_months === 0) {
     warranty_months = 24
   }
+
+  // Sıfır cihazda pil durumu otomatik 100
+  const battery_health = parsed.data.is_new ? 100 : (parsed.data.battery_health ?? null)
 
   const supabase = await createClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -271,6 +290,7 @@ export async function updateDevice(
       has_invoice: parsed.data.has_invoice,
       warranty_months,
       barcode: parsed.data.barcode,
+      battery_health,
     })
     .eq("id", deviceId)
 

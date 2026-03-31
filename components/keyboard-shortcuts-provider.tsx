@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useTransition } from "react"
+import React, { useState, useMemo, useEffect, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
@@ -57,68 +57,96 @@ function DeviceInfoPanel({ device }: { device: InStockDevice }) {
       ? device.recommended_sale_price - device.net_cost_to_us
       : null
 
+  function Badge({ children, color }: { children: React.ReactNode; color: "green" | "blue" | "orange" | "gray" }) {
+    const cls = {
+      green: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      blue: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+      orange: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+      gray: "bg-secondary text-secondary-foreground",
+    }[color]
+    return (
+      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
+        {children}
+      </span>
+    )
+  }
+
+  function Row({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+    return (
+      <div className="flex justify-between items-center gap-2">
+        <span className="text-muted-foreground shrink-0">{label}</span>
+        <span className={`font-medium text-right ${mono ? "font-mono text-xs" : ""}`}>{value}</span>
+      </div>
+    )
+  }
+
   return (
-    <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-4 text-sm">
+    <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-4 text-sm w-64 shrink-0">
       {/* Header */}
       <div>
-        <p className="font-semibold text-base leading-tight">
-          {device.brand} {device.model}
-        </p>
-        <p className="text-muted-foreground text-xs mt-0.5">
-          {device.color} · {device.storage}
-        </p>
+        <p className="font-semibold text-base leading-tight">{device.brand} {device.model}</p>
+        <p className="text-muted-foreground text-xs mt-0.5">{device.color} · {device.storage}</p>
       </div>
 
-      {/* Badges */}
+      {/* Status badges */}
       <div className="flex flex-wrap gap-1.5">
-        {device.is_new && (
-          <span className="rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 text-xs font-medium">
-            Sıfır
-          </span>
-        )}
-        {device.is_foreign && (
-          <span className="rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-0.5 text-xs font-medium">
-            Yabancı
-          </span>
-        )}
-        {device.imei_1 && (
-          <span className="rounded-full bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-mono">
-            {device.imei_1}
-          </span>
-        )}
+        {device.is_new && <Badge color="green">Sıfır</Badge>}
+        {!device.is_new && <Badge color="gray">İkinci El</Badge>}
+        {device.is_foreign && <Badge color="blue">Yabancı</Badge>}
+        {device.is_dual_sim && <Badge color="orange">Çift SIM</Badge>}
       </div>
+
+      {/* Physical details */}
+      <div className="space-y-1.5 border-t border-border pt-3">
+        <Row label="Kutu" value={device.has_box ? "✓ Var" : "✗ Yok"} />
+        <Row label="Fatura" value={device.has_invoice ? "✓ Var" : "✗ Yok"} />
+        <Row label="Garanti" value={device.warranty_months ? `${device.warranty_months} ay` : "—"} />
+        {device.battery_health != null && (
+          <Row
+            label="Pil Durumu"
+            value={
+              <span className={
+                device.battery_health >= 80 ? "text-green-600 font-semibold" :
+                device.battery_health >= 50 ? "text-yellow-600 font-semibold" :
+                "text-destructive font-semibold"
+              }>
+                {device.battery_health}%
+              </span>
+            }
+          />
+        )}
+        {device.barcode && <Row label="Barkod" value={device.barcode} mono />}
+      </div>
+
+      {/* IMEI */}
+      {(device.imei_1 || device.imei_2) && (
+        <div className="space-y-1.5 border-t border-border pt-3">
+          {device.imei_1 && <Row label="IMEI 1" value={device.imei_1} mono />}
+          {device.imei_2 && <Row label="IMEI 2" value={device.imei_2} mono />}
+        </div>
+      )}
 
       {/* Financials */}
-      <div className="space-y-2 pt-1 border-t border-border">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Alış Fiyatı</span>
-          <span className="font-medium">{formatPrice(device.purchase_price)}</span>
-        </div>
+      <div className="space-y-1.5 border-t border-border pt-3">
+        <Row label="Alış Fiyatı" value={formatPrice(device.purchase_price)} />
         {device.total_expenses > 0 && (
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Toplam Masraf</span>
-            <span className="font-medium text-orange-600">+{formatPrice(device.total_expenses)}</span>
-          </div>
+          <Row label="Masraflar" value={<span className="text-orange-600">+{formatPrice(device.total_expenses)}</span>} />
         )}
-        <div className="flex justify-between border-t border-border pt-2">
-          <span className="text-muted-foreground">Net Maliyet</span>
-          <span className="font-semibold">{formatPrice(device.net_cost_to_us)}</span>
-        </div>
+        <Row label="Net Maliyet" value={<span className="font-semibold">{formatPrice(device.net_cost_to_us)}</span>} />
         {device.recommended_sale_price != null && (
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Vitrin Fiyatı</span>
-            <span className="font-medium">{formatPrice(device.recommended_sale_price)}</span>
-          </div>
-        )}
-        {profit != null && (
-          <div className="flex justify-between rounded-lg bg-background px-3 py-2 border border-border">
-            <span className="font-medium">Beklenen Kar</span>
-            <span className={`font-bold ${profit >= 0 ? "text-green-600" : "text-destructive"}`}>
-              {formatPrice(profit)}
-            </span>
-          </div>
+          <Row label="Vitrin Fiyatı" value={formatPrice(device.recommended_sale_price)} />
         )}
       </div>
+
+      {/* Expected profit */}
+      {profit != null && (
+        <div className={`rounded-lg px-3 py-2 border flex justify-between items-center ${profit >= 0 ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-900/20" : "border-destructive/30 bg-destructive/5"}`}>
+          <span className="font-medium text-sm">Beklenen Kar</span>
+          <span className={`font-bold ${profit >= 0 ? "text-green-600" : "text-destructive"}`}>
+            {formatPrice(profit)}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
@@ -433,9 +461,17 @@ function F2Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="f2m_barcode">Barkod</Label>
-                <Input id="f2m_barcode" name="barcode" placeholder="Otomatik atanacak" />
+                <Label htmlFor="f2m_battery_health">Pil Durumu (%)</Label>
+                <Input
+                  id="f2m_battery_health" name="battery_health" type="number" min="0" max="100"
+                  placeholder={isNew ? "100 (otomatik)" : "0-100"}
+                  disabled={isNew}
+                />
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="f2m_barcode">Barkod</Label>
+              <Input id="f2m_barcode" name="barcode" placeholder="Otomatik atanacak" />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <DialogFooter className="pt-2">
