@@ -1,0 +1,649 @@
+"use client"
+
+import { useState, useMemo, useEffect, useTransition } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { createClient } from "@/lib/supabase/client"
+import { sellDevice, sellAccessory } from "@/actions/sales"
+import { addDevice } from "@/actions/devices"
+import { addAccessory } from "@/actions/accessories"
+import type {
+  InStockDevice,
+  Contact,
+  Accessory,
+  Brand,
+  Model,
+} from "@/lib/supabase/types"
+
+type ModalKey = "f1" | "f2" | "f3" | "f4" | "help"
+
+function formatPrice(price: number): string {
+  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(price)
+}
+
+function CheckboxField({
+  id, name, label, checked, onChange,
+}: {
+  id: string; name: string; label: string; checked: boolean; onChange: (v: boolean) => void
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="checkbox" id={id} name={name} value="true" checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 rounded border-input"
+      />
+      <Label htmlFor={id}>{label}</Label>
+    </div>
+  )
+}
+
+// ─── F1 Modal — Cihaz Satışı ──────────────────────────────────────────────────
+
+function DeviceInfoPanel({ device }: { device: InStockDevice }) {
+  const profit =
+    device.recommended_sale_price != null
+      ? device.recommended_sale_price - device.net_cost_to_us
+      : null
+
+  return (
+    <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-4 text-sm">
+      {/* Header */}
+      <div>
+        <p className="font-semibold text-base leading-tight">
+          {device.brand} {device.model}
+        </p>
+        <p className="text-muted-foreground text-xs mt-0.5">
+          {device.color} · {device.storage}
+        </p>
+      </div>
+
+      {/* Badges */}
+      <div className="flex flex-wrap gap-1.5">
+        {device.is_new && (
+          <span className="rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 text-xs font-medium">
+            Sıfır
+          </span>
+        )}
+        {device.is_foreign && (
+          <span className="rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-0.5 text-xs font-medium">
+            Yabancı
+          </span>
+        )}
+        {device.imei_1 && (
+          <span className="rounded-full bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-mono">
+            {device.imei_1}
+          </span>
+        )}
+      </div>
+
+      {/* Financials */}
+      <div className="space-y-2 pt-1 border-t border-border">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Alış Fiyatı</span>
+          <span className="font-medium">{formatPrice(device.purchase_price)}</span>
+        </div>
+        {device.total_expenses > 0 && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Toplam Masraf</span>
+            <span className="font-medium text-orange-600">+{formatPrice(device.total_expenses)}</span>
+          </div>
+        )}
+        <div className="flex justify-between border-t border-border pt-2">
+          <span className="text-muted-foreground">Net Maliyet</span>
+          <span className="font-semibold">{formatPrice(device.net_cost_to_us)}</span>
+        </div>
+        {device.recommended_sale_price != null && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Vitrin Fiyatı</span>
+            <span className="font-medium">{formatPrice(device.recommended_sale_price)}</span>
+          </div>
+        )}
+        {profit != null && (
+          <div className="flex justify-between rounded-lg bg-background px-3 py-2 border border-border">
+            <span className="font-medium">Beklenen Kar</span>
+            <span className={`font-bold ${profit >= 0 ? "text-green-600" : "text-destructive"}`}>
+              {formatPrice(profit)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function F1Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [devices, setDevices] = useState<InStockDevice[]>([])
+  const [contacts, setContacts] = useState<Pick<Contact, "id" | "full_name" | "contact_type">[]>([])
+  const [loading, setLoading] = useState(false)
+  const [selectedDeviceId, setSelectedDeviceId] = useState("")
+
+  useEffect(() => {
+    if (!open) return
+    setLoading(true)
+    setSelectedDeviceId("")
+    const supabase = createClient()
+    Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any).from("v_in_stock_devices").select("*").order("brand"),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any).from("contacts").select("id, full_name, contact_type").order("full_name"),
+    ]).then(([devRes, conRes]) => {
+      setDevices(devRes.data ?? [])
+      setContacts(conRes.data ?? [])
+      setLoading(false)
+    })
+  }, [open])
+
+  const grouped = useMemo(() => {
+    return devices.reduce<Record<string, InStockDevice[]>>((acc, d) => {
+      if (!acc[d.brand]) acc[d.brand] = []
+      acc[d.brand].push(d)
+      return acc
+    }, {})
+  }, [devices])
+
+  const selectedDevice = devices.find((d) => d.device_id === selectedDeviceId) ?? null
+
+  async function handleSubmit(formData: FormData) {
+    setError(null)
+    startTransition(async () => {
+      const result = await sellDevice(formData)
+      if ("error" in result) { setError(result.error); return }
+      toast.success("Satış tamamlandı")
+      onClose()
+      router.refresh()
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      {/* Wider dialog when a device is selected */}
+      <DialogContent className={`max-h-[90vh] overflow-y-auto transition-all duration-200 ${selectedDevice ? "sm:max-w-3xl" : "sm:max-w-lg"}`}>
+        <DialogHeader>
+          <DialogTitle>F1 — Cihaz Satışı</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <p className="text-sm text-muted-foreground py-4">Yükleniyor...</p>
+        ) : (
+          <div className={`flex gap-6 ${selectedDevice ? "flex-row items-start" : ""}`}>
+            {/* Form */}
+            <form action={handleSubmit} className="space-y-4 mt-2 flex-1 min-w-0">
+              <div className="space-y-1">
+                <Label htmlFor="f1m_device_id">Cihaz *</Label>
+                <select
+                  id="f1m_device_id"
+                  name="device_id"
+                  required
+                  value={selectedDeviceId}
+                  onChange={(e) => setSelectedDeviceId(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">Cihaz seçin...</option>
+                  {Object.entries(grouped).map(([brand, brandDevices]) => (
+                    <optgroup key={brand} label={brand}>
+                      {brandDevices.map((d) => (
+                        <option key={d.device_id} value={d.device_id}>
+                          {d.model} — {d.color} / {d.storage}
+                          {d.recommended_sale_price ? ` (Vitrin: ${formatPrice(d.recommended_sale_price)})` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="f1m_sale_price">Satış Fiyatı (₺) *</Label>
+                <Input
+                  id="f1m_sale_price"
+                  name="sale_price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder={selectedDevice?.recommended_sale_price ? String(selectedDevice.recommended_sale_price) : "0.00"}
+                  defaultValue={selectedDevice?.recommended_sale_price ?? ""}
+                  key={selectedDeviceId} // reset when device changes
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="f1m_payment_method">Ödeme Yöntemi</Label>
+                <select id="f1m_payment_method" name="payment_method"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  <option value="">Seçiniz (opsiyonel)</option>
+                  <option value="CASH">Nakit</option>
+                  <option value="CREDIT_CARD">Kredi Kartı</option>
+                  <option value="IBAN">IBAN</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="f1m_invoice_type">Fatura Tipi</Label>
+                <select id="f1m_invoice_type" name="invoice_type"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  <option value="">Seçiniz (opsiyonel)</option>
+                  <option value="AF">Alış Faturası (AF)</option>
+                  <option value="MF">Müşteri Faturası (MF)</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="f1m_contact_id">Müşteri Carisi</Label>
+                <select id="f1m_contact_id" name="contact_id"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  <option value="">Perakende (cari seçilmedi)</option>
+                  {contacts.filter((c) => c.contact_type === "CUSTOMER").map((c) => (
+                    <option key={c.id} value={c.id}>{c.full_name}</option>
+                  ))}
+                </select>
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <DialogFooter className="pt-2">
+                <Button type="button" variant="outline" onClick={onClose}>İptal</Button>
+                <Button type="submit" disabled={isPending}>{isPending ? "İşleniyor..." : "Satışı Tamamla"}</Button>
+              </DialogFooter>
+            </form>
+
+            {/* Device info panel — shown when a device is selected */}
+            {selectedDevice && (
+              <div className="mt-2 w-64 shrink-0">
+                <DeviceInfoPanel device={selectedDevice} />
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── F2 Modal — Cihaz Alışı ───────────────────────────────────────────────────
+
+function F2Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [brands, setBrands] = useState<Brand[]>([])
+  const [models, setModels] = useState<Model[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const [selectedBrandId, setSelectedBrandId] = useState("")
+  const [selectedModelId, setSelectedModelId] = useState("")
+  const [isDualSim, setIsDualSim] = useState(false)
+  const [isNew, setIsNew] = useState(true)
+  const [isForeign, setIsForeign] = useState(false)
+  const [hasBox, setHasBox] = useState(true)
+  const [hasInvoice, setHasInvoice] = useState(false)
+  const [warrantyMonths, setWarrantyMonths] = useState("24")
+  const [colorOptions, setColorOptions] = useState<string[]>([])
+  const [storageOptions, setStorageOptions] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!open) return
+    setLoading(true)
+    const supabase = createClient()
+    Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any).from("brands").select("*").order("name"),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any).from("models").select("*").order("name"),
+    ]).then(([bRes, mRes]) => {
+      setBrands(bRes.data ?? [])
+      setModels(mRes.data ?? [])
+      setLoading(false)
+    })
+  }, [open])
+
+  useEffect(() => {
+    if (!selectedModelId) { setColorOptions([]); setStorageOptions([]); return }
+    const supabase = createClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(supabase as any)
+      .from("model_variants")
+      .select("color, storage")
+      .eq("model_id", selectedModelId)
+      .then(({ data }: { data: { color: string; storage: string }[] | null }) => {
+        if (!data) return
+        setColorOptions([...new Set(data.map((v) => v.color))])
+        setStorageOptions([...new Set(data.map((v) => v.storage))])
+      })
+  }, [selectedModelId])
+
+  function handleIsNewChange(v: boolean) {
+    setIsNew(v)
+    setWarrantyMonths(v ? "24" : "0")
+  }
+
+  function handleClose() {
+    setSelectedBrandId(""); setSelectedModelId("")
+    setIsDualSim(false); setIsNew(true); setIsForeign(false)
+    setHasBox(true); setHasInvoice(false); setWarrantyMonths("24")
+    setColorOptions([]); setStorageOptions([])
+    setError(null)
+    onClose()
+  }
+
+  const filteredModels = models.filter((m) => m.brand_id === selectedBrandId)
+
+  async function handleSubmit(formData: FormData) {
+    setError(null)
+    formData.set("is_dual_sim", isDualSim ? "true" : "false")
+    formData.set("is_new", isNew ? "true" : "false")
+    formData.set("is_foreign", isForeign ? "true" : "false")
+    formData.set("has_box", hasBox ? "true" : "false")
+    formData.set("has_invoice", hasInvoice ? "true" : "false")
+    formData.set("warranty_months", warrantyMonths)
+    startTransition(async () => {
+      const result = await addDevice(formData)
+      if ("error" in result) { setError(result.error); return }
+      toast.success("Cihaz başarıyla eklendi")
+      handleClose()
+      router.refresh()
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>F2 — Cihaz Alışı</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <p className="text-sm text-muted-foreground py-4">Yükleniyor...</p>
+        ) : (
+          <form action={handleSubmit} className="space-y-4 mt-2">
+            <div className="space-y-1">
+              <Label htmlFor="f2m_brand_id">Marka *</Label>
+              <select id="f2m_brand_id" name="brand_id" required value={selectedBrandId}
+                onChange={(e) => { setSelectedBrandId(e.target.value); setSelectedModelId("") }}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                <option value="">Marka seçin...</option>
+                {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="f2m_model_id">Model *</Label>
+              <select id="f2m_model_id" name="model_id" required disabled={!selectedBrandId}
+                value={selectedModelId}
+                onChange={(e) => setSelectedModelId(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50">
+                <option value="">Model seçin...</option>
+                {filteredModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="f2m_color">Renk *</Label>
+                <Input id="f2m_color" name="color" placeholder="Siyah" required list="f2m_color_list" />
+                <datalist id="f2m_color_list">
+                  {colorOptions.map((c) => <option key={c} value={c} />)}
+                </datalist>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="f2m_storage">Hafıza *</Label>
+                <Input id="f2m_storage" name="storage" placeholder="128GB" required list="f2m_storage_list" />
+                <datalist id="f2m_storage_list">
+                  {storageOptions.map((s) => <option key={s} value={s} />)}
+                </datalist>
+              </div>
+            </div>
+            <CheckboxField id="f2m_is_dual_sim" name="is_dual_sim" label="Çift SIM" checked={isDualSim} onChange={setIsDualSim} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="f2m_purchase_price">Alış Fiyatı (₺) *</Label>
+                <Input id="f2m_purchase_price" name="purchase_price" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="f2m_recommended_sale_price">Vitrin Fiyatı (₺)</Label>
+                <Input id="f2m_recommended_sale_price" name="recommended_sale_price" type="number" min="0.01" step="0.01" placeholder="Opsiyonel" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="f2m_imei_1">IMEI 1</Label>
+              <Input id="f2m_imei_1" name="imei_1" placeholder="15 haneli IMEI (opsiyonel)" maxLength={15} />
+            </div>
+            {isDualSim && (
+              <div className="space-y-1">
+                <Label htmlFor="f2m_imei_2">IMEI 2 *</Label>
+                <Input id="f2m_imei_2" name="imei_2" placeholder="15 haneli IMEI (zorunlu)" maxLength={15} required />
+              </div>
+            )}
+            <CheckboxField id="f2m_is_new" name="is_new" label="Sıfır cihaz" checked={isNew} onChange={handleIsNewChange} />
+            <CheckboxField id="f2m_is_foreign" name="is_foreign" label="Yabancı menşei" checked={isForeign} onChange={setIsForeign} />
+            <CheckboxField id="f2m_has_box" name="has_box" label="Kutu var" checked={hasBox} onChange={setHasBox} />
+            <CheckboxField id="f2m_has_invoice" name="has_invoice" label="Fatura var" checked={hasInvoice} onChange={setHasInvoice} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="f2m_warranty_months">Garanti (ay)</Label>
+                <Input
+                  id="f2m_warranty_months" name="warranty_months" type="number" min="0"
+                  value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="f2m_barcode">Barkod</Label>
+                <Input id="f2m_barcode" name="barcode" placeholder="Otomatik atanacak" />
+              </div>
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={handleClose}>İptal</Button>
+              <Button type="submit" disabled={isPending}>{isPending ? "Ekleniyor..." : "Cihaz Ekle"}</Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── F3 Modal — Aksesuar Alışı ────────────────────────────────────────────────
+
+function F3Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(formData: FormData) {
+    setError(null)
+    startTransition(async () => {
+      const result = await addAccessory(formData)
+      if ("error" in result) { setError(result.error); return }
+      toast.success("Aksesuar başarıyla eklendi")
+      onClose()
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>F3 — Aksesuar Alışı</DialogTitle>
+        </DialogHeader>
+        <form action={handleSubmit} className="space-y-4 mt-2">
+          <div className="space-y-1">
+            <Label htmlFor="f3m_barcode">Barkod</Label>
+            <Input id="f3m_barcode" name="barcode" placeholder="Otomatik atanacak" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="f3m_brand">Marka</Label>
+            <Input id="f3m_brand" name="brand" placeholder="Marka (opsiyonel)" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="f3m_category">Kategori</Label>
+            <Input id="f3m_category" name="category" placeholder="Kategori (opsiyonel)" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="f3m_stock_quantity">Stok Adedi *</Label>
+            <Input id="f3m_stock_quantity" name="stock_quantity" type="number" min="0" step="1" placeholder="0" required />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="f3m_purchase_price">Alış Fiyatı (₺) *</Label>
+              <Input id="f3m_purchase_price" name="purchase_price" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="f3m_sale_price">Satış Fiyatı (₺) *</Label>
+              <Input id="f3m_sale_price" name="sale_price" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+            </div>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>İptal</Button>
+            <Button type="submit" disabled={isPending}>{isPending ? "Ekleniyor..." : "Aksesuar Ekle"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── F4 Modal — Aksesuar Satışı ───────────────────────────────────────────────
+
+function F4Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [accessories, setAccessories] = useState<Pick<Accessory, "id" | "barcode" | "brand" | "category" | "stock_quantity" | "sale_price">[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setLoading(true)
+    const supabase = createClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(supabase as any)
+      .from("accessories")
+      .select("id, barcode, brand, category, stock_quantity, sale_price")
+      .gt("stock_quantity", 0)
+      .order("barcode")
+      .then(({ data }: { data: Pick<Accessory, "id" | "barcode" | "brand" | "category" | "stock_quantity" | "sale_price">[] | null }) => {
+        setAccessories(data ?? [])
+        setLoading(false)
+      })
+  }, [open])
+
+  async function handleSubmit(formData: FormData) {
+    setError(null)
+    startTransition(async () => {
+      const result = await sellAccessory(formData)
+      if ("error" in result) { setError(result.error); return }
+      toast.success("Aksesuar satışı tamamlandı")
+      onClose()
+      router.refresh()
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>F4 — Aksesuar Satışı</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <p className="text-sm text-muted-foreground py-4">Yükleniyor...</p>
+        ) : (
+          <form action={handleSubmit} className="space-y-4 mt-2">
+            <div className="space-y-1">
+              <Label htmlFor="f4m_accessory_barcode">Aksesuar *</Label>
+              <select id="f4m_accessory_barcode" name="accessory_barcode" required
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                <option value="">Aksesuar seçin...</option>
+                {accessories.map((a) => (
+                  <option key={a.barcode} value={a.barcode}>
+                    {a.barcode} — {[a.brand, a.category].filter(Boolean).join(" / ") || "—"} (Stok: {a.stock_quantity})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="f4m_quantity">Adet *</Label>
+              <Input id="f4m_quantity" name="quantity" type="number" min="1" step="1" defaultValue="1" required />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={onClose}>İptal</Button>
+              <Button type="submit" disabled={isPending}>{isPending ? "İşleniyor..." : "Satışı Tamamla"}</Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Help + Provider ──────────────────────────────────────────────────────────
+
+const SHORTCUTS = [
+  { key: "N / F1", label: "F1 Cihaz Satışı (modal)" },
+  { key: "F2", label: "F2 Cihaz Alışı (modal)" },
+  { key: "F3", label: "F3 Aksesuar Alışı (modal)" },
+  { key: "F4", label: "F4 Aksesuar Satışı (modal)" },
+  { key: "D", label: "Cihazlar sayfası" },
+  { key: "A", label: "Aksesuarlar sayfası" },
+  { key: "?", label: "Bu yardım" },
+]
+
+export function KeyboardShortcutsProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const [openModal, setOpenModal] = useState<ModalKey | null>(null)
+
+  const shortcuts = useMemo(
+    () => ({
+      n: () => setOpenModal("f1"),
+      N: () => setOpenModal("f1"),
+      d: () => router.push("/devices"),
+      D: () => router.push("/devices"),
+      a: () => router.push("/accessories"),
+      A: () => router.push("/accessories"),
+      "?": () => setOpenModal("help"),
+      F1: () => setOpenModal("f1"),
+      F2: () => setOpenModal("f2"),
+      F3: () => setOpenModal("f3"),
+      F4: () => setOpenModal("f4"),
+    }),
+    [router]
+  )
+
+  useKeyboardShortcuts(shortcuts)
+
+  function close() { setOpenModal(null) }
+
+  return (
+    <>
+      {children}
+      <F1Modal open={openModal === "f1"} onClose={close} />
+      <F2Modal open={openModal === "f2"} onClose={close} />
+      <F3Modal open={openModal === "f3"} onClose={close} />
+      <F4Modal open={openModal === "f4"} onClose={close} />
+      <Dialog open={openModal === "help"} onOpenChange={(v) => !v && close()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Klavye Kısayolları</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {SHORTCUTS.map(({ key, label }) => (
+              <div key={key} className="flex items-center justify-between py-1">
+                <span className="text-sm text-muted-foreground">{label}</span>
+                <kbd className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-xs">
+                  {key}
+                </kbd>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}

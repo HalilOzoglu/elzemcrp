@@ -6,7 +6,7 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
 
 ## Görevler
 
-- [ ] 1. Proje altyapısı ve temel yapılandırma
+- [-] 1. Proje altyapısı ve temel yapılandırma
   - Next.js App Router projesi oluştur (`npx create-next-app@latest`); Tailwind CSS, App Router ve `@/*` alias seçeneklerini etkinleştir
   - `npm install @supabase/supabase-js @supabase/ssr` ile Supabase paketlerini ekle; `npx shadcn@latest init` ile Shadcn/ui'yi başlat; Zod, Vitest ve fast-check bağımlılıklarını ekle
   - `.env.local` dosyasını oluştur: `NEXT_PUBLIC_SUPABASE_URL` ve `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` değişkenlerini tanımla
@@ -15,12 +15,12 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
   - `__tests__/unit/` ve `__tests__/property/` dizin yapısını oluştur, `vitest.config.ts` dosyasını yapılandır
   - _Requirements: 1.5, 1.6, 9.3_
 
-  - [ ]* 1.1 Auth guard middleware için property testi yaz
+  - [ ] 1.1 Auth guard middleware için property testi yaz
     - **Property 1: Korumalı Rota Erişim Reddi**
     - **Validates: Requirements 1.5**
 
-- [ ] 2. Kimlik doğrulama modülü
-  - [ ] 2.1 Giriş sayfası ve Server Action'ı uygula
+- [x] 2. Kimlik doğrulama modülü
+  - [x] 2.1 Giriş sayfası ve Server Action'ı uygula
     - `app/(auth)/login/page.tsx` oluştur; Shadcn/ui `Form`, `Input`, `Button` bileşenleriyle e-posta/şifre formu
     - `actions/auth.ts` içinde `signIn` Server Action'ı yaz: `signInWithPassword` çağrısı, başarıda `/`'e redirect, hata durumunda inline hata mesajı
     - `signOut` Server Action'ı yaz: oturumu sonlandır, `/login`'e redirect
@@ -31,8 +31,8 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
     - Geçersiz kimlik bilgilerinde hata mesajı gösterimi
     - _Requirements: 1.2, 1.3, 1.4_
 
-- [ ] 3. Dashboard modülü
-  - [ ] 3.1 Dashboard Server Component'ı uygula
+- [x] 3. Dashboard modülü
+  - [x] 3.1 Dashboard Server Component'ı uygula
     - `app/(dashboard)/layout.tsx` oluştur: auth guard + Shadcn/ui Sidebar navigasyon
     - `app/(dashboard)/page.tsx` oluştur: `Promise.all` ile paralel veri çekimi (stoktaki cihaz sayısı, bugünkü satış, `v_monthly_sales_profit`, `v_low_stock_accessories`)
     - Özet kartları ve düşük stok uyarı kartlarını render et; her karta tıklandığında ilgili modül sayfasına yönlendir
@@ -44,11 +44,11 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
     - Skeleton yükleme göstergesinin varlığı
     - _Requirements: 2.1, 2.3, 2.4_
 
-- [ ] 4. Checkpoint — Tüm testlerin geçtiğini doğrula
+- [x] 4. Checkpoint — Tüm testlerin geçtiğini doğrula
   - Tüm testlerin geçtiğini doğrula, sorular varsa kullanıcıya sor.
 
-- [ ] 5. Katalog modülü (Marka / Model / Varyant)
-  - [ ] 5.1 Katalog sayfası ve Server Action'ları uygula
+- [x] 5. Katalog modülü (Marka / Model / Varyant)
+  - [x] 5.1 Katalog sayfası ve Server Action'ları uygula
     - `app/(dashboard)/catalog/page.tsx` oluştur: üç sekme (Markalar / Modeller / Varyantlar), SSR ile veri çekimi
     - `actions/catalog.ts` içinde `addBrand`, `updateBrand`, `deleteBrand`, `addModel`, `updateModel`, `deleteModel`, `addVariant`, `updateVariant`, `deleteVariant` Server Action'larını yaz
     - Ekleme/düzenleme için `Dialog` formları, silme için `AlertDialog` onayı uygula
@@ -69,8 +69,8 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
     - **Property 5: Varyant Zorunlu Alan Validasyonu**
     - **Validates: Requirements 3.6**
 
-- [ ] 6. Cihaz envanteri modülü
-  - [ ] 6.1 Cihaz listesi sayfasını uygula
+- [x] 6. Cihaz envanteri modülü
+  - [x] 6.1 Cihaz listesi sayfasını uygula
     - `app/(dashboard)/devices/page.tsx` oluştur: `v_in_stock_devices` view'ından SSR ile veri çekimi
     - Durum filtresi (IN_STOCK/SOLD/RETURNED) URL search param ile yönet; sunucu tarafında filtrele
     - Yeni cihaz ekleme `Dialog` formu: zorunlu alanlar model varyantı + alış fiyatı; IMEI ve vitrin fiyatı opsiyonel
@@ -91,7 +91,7 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
     - **Property 9: Cihaz Durum Filtresi Tutarlılığı**
     - **Validates: Requirements 4.9**
 
-  - [ ] 6.5 Cihaz detay sayfasını uygula
+  - [x] 6.5 Cihaz detay sayfasını uygula
     - `app/(dashboard)/devices/[id]/page.tsx` oluştur: `get_total_device_cost()` ve `get_device_net_profit()` RPC çağrıları ile maliyet/kar gösterimi
     - Vitrin fiyatı inline düzenleme: eski/yeni fiyat yan yana; `updateDevicePrice` Server Action'ı yaz (`device_price_history` tetikleyici otomatik kaydeder)
     - Masraf ekleme formu: `addDeviceExpense` Server Action'ı yaz
@@ -101,8 +101,8 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
     - **Property 8: Fiyat Değişikliği History Kaydı**
     - **Validates: Requirements 4.6**
 
-- [ ] 7. Aksesuar modülü
-  - [ ] 7.1 Aksesuar listesi sayfasını uygula
+- [x] 7. Aksesuar modülü
+  - [x] 7.1 Aksesuar listesi sayfasını uygula
     - `app/(dashboard)/accessories/page.tsx` oluştur: SSR ile aksesuar listesi, barkod/ürün adı arama URL search param + `ilike` sorgusu
     - Stok ≤ 5 için `Badge` bileşeni kırmızı/sarı renk ile göster
     - Yeni aksesuar ekleme `Dialog` formu: tüm alanlar zorunlu (barkod, ad, stok, alış fiyatı, satış fiyatı)
@@ -132,11 +132,11 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
     - **Property 13: Aksesuar Arama Tutarlılığı**
     - **Validates: Requirements 5.6**
 
-- [ ] 8. Checkpoint — Tüm testlerin geçtiğini doğrula
+- [x] 8. Checkpoint — Tüm testlerin geçtiğini doğrula
   - Tüm testlerin geçtiğini doğrula, sorular varsa kullanıcıya sor.
 
-- [ ] 9. Cari modülü
-  - [ ] 9.1 Cari listesi ve detay sayfalarını uygula
+- [x] 9. Cari modülü
+  - [x] 9.1 Cari listesi ve detay sayfalarını uygula
     - `app/(dashboard)/contacts/page.tsx` oluştur: SSR ile cari listesi, CUSTOMER/SUPPLIER filtresi URL search param ile
     - `v_contact_volumes` view'ından işlem hacmini göster
     - Yeni cari ekleme `Dialog` formu: ad ve cari tipi zorunlu
@@ -161,13 +161,13 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
     - Geçmiş satışların tarih, tutar ve ödeme yöntemi ile listelendiğini doğrula
     - _Requirements: 6.5_
 
-- [ ] 10. Satış modülü
-  - [ ] 10.1 Satış listesi sayfasını uygula
+- [x] 10. Satış modülü
+  - [x] 10.1 Satış listesi sayfasını uygula
     - `app/(dashboard)/sales/page.tsx` oluştur: SSR ile satış listesi; `contact_id = NULL` olan kayıtlar "Perakende" etiketi ile gösterilir
     - Tarih aralığı (`DatePicker`), ödeme yöntemi ve fatura tipi filtreleri URL search param ile yönet
     - _Requirements: 7.7, 7.8_
 
-  - [ ] 10.2 Cihaz satışı Server Action'ı uygula
+  - [x] 10.2 Cihaz satışı Server Action'ı uygula
     - `app/(dashboard)/sales/new/page.tsx` oluştur: iki sekme (Cihaz Satışı / Aksesuar Satışı)
     - `actions/sales.ts` içinde `sellDevice` Server Action'ı yaz: `sell_device()` RPC çağrısı; cihaz seçimi, satış fiyatı, ödeme yöntemi, fatura tipi; müşteri carisi opsiyonel (NULL → "Perakende")
     - Cihaz durumu IN_STOCK değilse satışı engelle, toast ile bildir
@@ -182,7 +182,7 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
     - **Property 18: Stok Dışı Cihaz Satış Reddi**
     - **Validates: Requirements 7.5**
 
-  - [ ] 10.5 Aksesuar satışı Server Action'ı uygula
+  - [x] 10.5 Aksesuar satışı Server Action'ı uygula
     - `actions/sales.ts` içinde `sellAccessory` Server Action'ı yaz: `sell_accessory()` RPC çağrısı; barkod ile aksesuar seçimi, adet; müşteri carisi, ödeme yöntemi ve fatura tipi opsiyonel
     - Stok yetersizliğinde satışı engelle, mevcut stok adedini toast ile göster
     - Satış tamamlandığında stok adedini düşür, özet `Dialog` göster
@@ -204,11 +204,11 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
     - Satış tamamlandığında ürün, tutar ve ödeme yöntemi bilgilerinin özet Dialog'da gösterildiğini doğrula
     - _Requirements: 7.7_
 
-- [ ] 11. Checkpoint — Tüm testlerin geçtiğini doğrula
+- [x] 11. Checkpoint — Tüm testlerin geçtiğini doğrula
   - Tüm testlerin geçtiğini doğrula, sorular varsa kullanıcıya sor.
 
-- [ ] 12. Raporlama modülü
-  - [ ] 12.1 Raporlar sayfasını uygula
+- [x] 12. Raporlama modülü
+  - [x] 12.1 Raporlar sayfasını uygula
     - `app/(dashboard)/reports/page.tsx` oluştur: SSR ile `v_monthly_sales_profit` verisi; Recharts bar grafiği + tablo (satış adedi, toplam tutar, maliyet, net kar)
     - `v_in_stock_devices` aggregate sorgusu ile stok değeri özeti (toplam alış maliyeti + toplam vitrin fiyatı)
     - `v_low_stock_accessories` view'ından kritik stok listesi
@@ -222,14 +222,14 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
     - Skeleton yükleme göstergesinin varlığı
     - _Requirements: 8.1, 8.2, 8.5_
 
-- [ ] 13. UX ve form validasyonu
-  - [ ] 13.1 Inline form validasyonu ve Optimistic UI geri dönüşünü uygula
+- [x] 13. UX ve form validasyonu
+  - [x] 13.1 Inline form validasyonu ve Optimistic UI geri dönüşünü uygula
     - Tüm formlarda Zod şemalarını `react-hook-form` ile entegre et; geçersiz değerde ilgili alanın yanında inline hata mesajı göster
     - Tüm Server Action'larda `useOptimistic` hook'u ile optimistic state yönetimini tamamla; sunucu hatası durumunda önceki state'e dön ve `Sonner` toast ile bildir
     - Ağ/sunucu hatalarında toast + retry butonu göster
     - _Requirements: 9.1, 9.4, 9.6_
 
-  - [ ] 13.2 Klavye kısayolları ve Sheet panellerini uygula
+  - [x] 13.2 Klavye kısayolları ve Sheet panellerini uygula
     - `hooks/useKeyboardShortcuts.ts` hook'unu yaz: form alanı odaktayken devre dışı kalır
     - `(dashboard)/layout.tsx` içinde global kısayolları bağla: `N` → yeni satış, `D` → yeni cihaz, `A` → yeni aksesuar, `?` → yardım dialog'u
     - Cihaz listesinde satıra tıklandığında `Sheet` paneli aç: vitrin fiyatı düzenleme, durum değiştirme, masraf ekleme
@@ -246,7 +246,7 @@ Next.js App Router, Supabase ve Shadcn/ui üzerine inşa edilmiş POS/ERP uygula
     - **Property 22: Inline Form Validasyonu**
     - **Validates: Requirements 9.4**
 
-- [ ] 14. Son checkpoint — Tüm testlerin geçtiğini doğrula
+- [x] 14. Son checkpoint — Tüm testlerin geçtiğini doğrula
   - Tüm testlerin geçtiğini doğrula, sorular varsa kullanıcıya sor.
 
 ## Notlar
