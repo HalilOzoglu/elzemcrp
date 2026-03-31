@@ -128,7 +128,6 @@ export interface InStockDevice {
   barcode: string | null
   battery_health: number | null
   status: DeviceStatus
-  battery_health: number | null
   purchase_price: number
   total_expenses: number
   net_cost_to_us: number

@@ -11,6 +11,7 @@ interface SalesPageProps {
     to?: string
     payment?: string
     invoice?: string
+    af_status?: string
   }>
 }
 
@@ -20,6 +21,7 @@ export interface SaleRow {
   sale_price: number
   payment_method: PaymentMethod | null
   invoice_type: InvoiceType | null
+  af_status: string | null
   customer_id: string | null
   customer_name: string | null
   device_id: string | null
@@ -27,7 +29,7 @@ export interface SaleRow {
 }
 
 export default async function SalesPage({ searchParams }: SalesPageProps) {
-  const { from, to, payment, invoice } = await searchParams
+  const { from, to, payment, invoice, af_status } = await searchParams
   const supabase = await createClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,6 +42,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       sale_price,
       payment_method,
       invoice_type,
+      af_status,
       customer_id,
       device_id,
       contacts:customer_id ( full_name ),
@@ -57,17 +60,16 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     )
     .order("sale_date", { ascending: false })
 
-  if (from) {
-    query = query.gte("sale_date", from)
-  }
-  if (to) {
-    query = query.lte("sale_date", to)
-  }
+  if (from) query = query.gte("sale_date", from)
+  if (to) query = query.lte("sale_date", to)
   if (payment === "CASH" || payment === "CREDIT_CARD" || payment === "IBAN") {
     query = query.eq("payment_method", payment)
   }
   if (invoice === "AF" || invoice === "MF") {
     query = query.eq("invoice_type", invoice)
+  }
+  if (af_status === "PENDING" || af_status === "ISSUED") {
+    query = query.eq("af_status", af_status)
   }
 
   const { data } = await query
@@ -89,6 +91,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       sale_price: row.sale_price,
       payment_method: row.payment_method,
       invoice_type: row.invoice_type,
+      af_status: row.af_status ?? null,
       customer_id: row.customer_id,
       customer_name: row.contacts?.full_name ?? null,
       device_id: row.device_id,
@@ -101,6 +104,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       ? (payment as PaymentMethod)
       : null
   const activeInvoice = invoice === "AF" || invoice === "MF" ? (invoice as InvoiceType) : null
+  const activeAfStatus =
+    af_status === "PENDING" || af_status === "ISSUED" ? af_status : null
 
   return (
     <div className="space-y-6">
@@ -117,6 +122,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
           activeTo={to ?? ""}
           activePayment={activePayment}
           activeInvoice={activeInvoice}
+          activeAfStatus={activeAfStatus}
         />
       </Suspense>
     </div>

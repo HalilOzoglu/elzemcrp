@@ -170,3 +170,29 @@ export async function sellAccessory(formData: FormData): Promise<SellAccessoryRe
     },
   }
 }
+
+// ─── updateAfStatus ───────────────────────────────────────────────────────────
+
+export type ActionResult = { success: true } | { error: string }
+
+export async function updateAfStatus(
+  saleId: string,
+  status: "PENDING" | "ISSUED"
+): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from("sales")
+    .update({ af_status: status })
+    .eq("id", saleId)
+
+  if (error) {
+    return { error: error.message ?? "AF durumu güncellenirken hata oluştu." }
+  }
+
+  revalidatePath("/sales")
+  revalidatePath("/")
+
+  return { success: true }
+}

@@ -39,6 +39,22 @@ function formatPrice(price: number): string {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(price)
 }
 
+function AfStatusBadge({ status }: { status: string | null }) {
+  if (!status) return null
+  const isPending = status === "PENDING"
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+        isPending
+          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+          : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      }`}
+    >
+      {isPending ? "Bekleyen" : "Kesildi"}
+    </span>
+  )
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface SalesClientProps {
@@ -47,6 +63,7 @@ interface SalesClientProps {
   activeTo: string
   activePayment: PaymentMethod | null
   activeInvoice: InvoiceType | null
+  activeAfStatus: string | null
 }
 
 // ─── Main Client Component ────────────────────────────────────────────────────
@@ -57,6 +74,7 @@ export function SalesClient({
   activeTo,
   activePayment,
   activeInvoice,
+  activeAfStatus,
 }: SalesClientProps) {
   const router = useRouter()
 
@@ -67,6 +85,7 @@ export function SalesClient({
       to: activeTo || null,
       payment: activePayment,
       invoice: activeInvoice,
+      af_status: activeAfStatus,
     }
     const merged = { ...current, ...overrides }
     for (const [key, value] of Object.entries(merged)) {
@@ -92,11 +111,15 @@ export function SalesClient({
     navigate({ invoice: activeInvoice === type ? null : type })
   }
 
+  function toggleAfStatus(status: string) {
+    navigate({ af_status: activeAfStatus === status ? null : status })
+  }
+
   function clearFilters() {
     router.push("/sales")
   }
 
-  const hasFilters = activeFrom || activeTo || activePayment || activeInvoice
+  const hasFilters = activeFrom || activeTo || activePayment || activeInvoice || activeAfStatus
 
   return (
     <div className="space-y-4">
@@ -152,6 +175,24 @@ export function SalesClient({
           ))}
         </div>
 
+        {/* AF Status filter */}
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground mr-1">AF Durumu:</span>
+          {[
+            { value: "PENDING", label: "Bekleyen" },
+            { value: "ISSUED", label: "Kesildi" },
+          ].map(({ value, label }) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={activeAfStatus === value ? "default" : "outline"}
+              onClick={() => toggleAfStatus(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+
         {hasFilters && (
           <Button size="sm" variant="ghost" onClick={clearFilters}>
             Filtreleri Temizle
@@ -175,12 +216,13 @@ export function SalesClient({
             <TableHead>Tutar</TableHead>
             <TableHead>Ödeme Yöntemi</TableHead>
             <TableHead>Fatura Tipi</TableHead>
+            <TableHead>AF Durumu</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {sales.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 {hasFilters ? "Filtreye uyan satış bulunamadı." : "Henüz satış kaydı yok."}
               </TableCell>
             </TableRow>
@@ -204,6 +246,13 @@ export function SalesClient({
                 </TableCell>
                 <TableCell>
                   {sale.invoice_type ? INVOICE_LABELS[sale.invoice_type] : "—"}
+                </TableCell>
+                <TableCell>
+                  {sale.invoice_type === "AF" ? (
+                    <AfStatusBadge status={sale.af_status} />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
               </TableRow>
             ))

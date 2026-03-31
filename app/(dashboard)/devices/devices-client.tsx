@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useOptimistic, useState, useTransition, useEffect } from "react"
+import { useOptimistic, useState, useTransition, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   Table,
@@ -29,11 +29,30 @@ interface DevicesClientProps {
   devices: InStockDevice[]
   brands: Brand[]
   models: Model[]
+  activeBrand: string
+  activeCondition: string
+  activeForeign: boolean
+  activeQ: string
 }
 
 function formatPrice(price: number | null): string {
   if (price === null) return "—"
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(price)
+}
+
+function BatteryBadge({ value }: { value: number | null }) {
+  if (value === null) return <span className="text-muted-foreground">—</span>
+  const color =
+    value >= 80
+      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      : value >= 50
+      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+      : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>
+      %{value}
+    </span>
+  )
 }
 
 function CheckboxField({
@@ -76,7 +95,6 @@ function AddDeviceDialog({ open, onOpenChange, brands, models, onAdd, error }: A
   const [colorOptions, setColorOptions] = useState<string[]>([])
   const [storageOptions, setStorageOptions] = useState<string[]>([])
 
-  // Fetch variants when model changes
   useEffect(() => {
     if (!selectedModelId) { setColorOptions([]); setStorageOptions([]); return }
     const supabase = createClient()
@@ -329,9 +347,18 @@ function EditDeviceDialog({ device, open, onOpenChange, onSave, error }: EditDia
 
 // ─── Main Client Component ────────────────────────────────────────────────────
 
-export function DevicesClient({ devices, brands, models }: DevicesClientProps) {
+export function DevicesClient({
+  devices,
+  brands,
+  models,
+  activeBrand,
+  activeCondition,
+  activeForeign,
+  activeQ,
+}: DevicesClientProps) {
   const router = useRouter()
   const [, startTransition] = useTransition()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [optimisticDevices, dispatchOptimistic] = useOptimistic(
     devices,
@@ -347,25 +374,44 @@ export function DevicesClient({ devices, brands, models }: DevicesClientProps) {
     }
   )
 
-  const [searchValue, setSearchValue] = useState("")
-  const filtered = searchValue.trim()
-    ? optimisticDevices.filter((d) => {
-        const q = searchValue.toLowerCase()
-        return (
-          d.brand.toLowerCase().includes(q) ||
-          d.model.toLowerCase().includes(q) ||
-          d.color.toLowerCase().includes(q) ||
-          d.storage.toLowerCase().includes(q) ||
-          (d.imei_1 ?? "").includes(q)
-        )
-      })
-    : optimisticDevices
+  const [localQ, setLocalQ] = useState(activeQ)
 
   const [addOpen, setAddOpen] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
   const [editDevice, setEditDevice] = useState<InStockDevice | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+
+  function buildParams(overrides: Record<string, string | null>) {
+    const params = new URLSearchParams()
+    const current: Record<string, string | null> = {
+      brand: activeBrand || null,
+      condition: activeCondition || null,
+      foreign: activeForeign ? "true" : null,
+      q: activeQ || null,
+    }
+    const merged = { ...current, ...overrides }
+    for (const [key, value] of Object.entries(merged)) {
+      if (value) params.set(key, value)
+    }
+    return params.toString()
+  }
+
+  function navigate(overrides: Record<string, string | null>) {
+    const qs = buildParams(overrides)
+    router.push(`/devices${qs ? `?${qs}` : ""}`)
+  }
+
+  const handleQChange = useCallback((value: string) => {
+    setLocalQ(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      navigate({ q: value || null })
+    }, 300)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBrand, activeCondition, activeForeign, activeQ])
+
+  const hasFilters = activeBrand || activeCondition || activeForeign || activeQ
 
   async function handleAdd(formData: FormData) {
     setAddError(null)
@@ -447,16 +493,70 @@ export function DevicesClient({ devices, brands, models }: DevicesClientProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
+      {/* Filters */}
+      <div className="flex flex-wrap items-end gap-3">
+        {/* Text search */}
         <Input
           placeholder="Marka, model, renk, IMEI ara..."
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
-          className="w-72"
+          value={localQ}
+          onChange={(e) => handleQChange(e.target.value)}
+          className="w-64"
         />
-        <Button size="sm" onClick={() => { setAddError(null); setAddOpen(true) }}>
-          + Yeni Cihaz Ekle
+
+        {/* Brand dropdown */}
+        <select
+          value={activeBrand}
+          onChange={(e) => navigate({ brand: e.target.value || null })}
+          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+        >
+          <option value="">Tüm Markalar</option>
+          {brands.map((b) => (
+            <option key={b.id} value={b.name}>{b.name}</option>
+          ))}
+        </select>
+
+        {/* Condition buttons */}
+        <div className="flex items-center gap-1">
+          {[
+            { value: "", label: "Tümü" },
+            { value: "new", label: "Sıfır" },
+            { value: "used", label: "İkinci El" },
+          ].map(({ value, label }) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={activeCondition === value ? "default" : "outline"}
+              onClick={() => navigate({ condition: value || null })}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+
+        {/* Foreign toggle */}
+        <Button
+          size="sm"
+          variant={activeForeign ? "default" : "outline"}
+          onClick={() => navigate({ foreign: activeForeign ? null : "true" })}
+        >
+          Yabancı Menşei
         </Button>
+
+        {hasFilters && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => { setLocalQ(""); router.push("/devices") }}
+          >
+            Filtreleri Temizle
+          </Button>
+        )}
+
+        <div className="ml-auto">
+          <Button size="sm" onClick={() => { setAddError(null); setAddOpen(true) }}>
+            + Yeni Cihaz Ekle
+          </Button>
+        </div>
       </div>
 
       <Table>
@@ -466,20 +566,21 @@ export function DevicesClient({ devices, brands, models }: DevicesClientProps) {
             <TableHead>Renk / Hafıza</TableHead>
             <TableHead>IMEI</TableHead>
             <TableHead>Durum</TableHead>
+            <TableHead>Pil</TableHead>
             <TableHead>Alış Fiyatı</TableHead>
             <TableHead>Vitrin Fiyatı</TableHead>
             <TableHead></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.length === 0 ? (
+          {optimisticDevices.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground">
-                {searchValue ? "Arama sonucu bulunamadı." : "Henüz cihaz eklenmemiş."}
+              <TableCell colSpan={8} className="text-center text-muted-foreground">
+                {hasFilters ? "Filtreye uyan cihaz bulunamadı." : "Henüz cihaz eklenmemiş."}
               </TableCell>
             </TableRow>
           ) : (
-            filtered.map((device) => (
+            optimisticDevices.map((device) => (
               <TableRow
                 key={device.device_id}
                 className={`cursor-pointer hover:bg-muted/50 ${device.device_id.startsWith("temp-") ? "opacity-60" : ""}`}
@@ -497,6 +598,9 @@ export function DevicesClient({ devices, brands, models }: DevicesClientProps) {
                     {device.is_new && <Badge variant="default" className="text-xs">Sıfır</Badge>}
                     {device.is_foreign && <Badge variant="outline" className="text-xs">Yabancı</Badge>}
                   </div>
+                </TableCell>
+                <TableCell>
+                  <BatteryBadge value={device.battery_health} />
                 </TableCell>
                 <TableCell>{formatPrice(device.purchase_price)}</TableCell>
                 <TableCell>{formatPrice(device.recommended_sale_price)}</TableCell>
