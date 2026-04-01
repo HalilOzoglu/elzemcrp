@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { generateDeviceBarcode } from "@/lib/barcode"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -224,7 +225,7 @@ export async function addDevice(formData: FormData): Promise<ActionResult> {
     has_box,
     has_invoice,
     warranty_months,
-    barcode: barcode ?? `DEV-${Date.now()}`,
+    barcode: barcode ?? generateDeviceBarcode(),
     battery_health,
     status: "IN_STOCK",
   })

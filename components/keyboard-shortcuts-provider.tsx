@@ -26,7 +26,7 @@ import type {
   Model,
 } from "@/lib/supabase/types"
 
-type ModalKey = "f1" | "f2" | "f3" | "f4" | "help"
+type ModalKey = "f1" | "f2" | "f3" | "f4" | "f5" | "help"
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(price)
@@ -151,7 +151,7 @@ function DeviceInfoPanel({ device }: { device: InStockDevice }) {
   )
 }
 
-function F1Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function F1Modal({ open, onClose, preselectedDeviceId }: { open: boolean; onClose: () => void; preselectedDeviceId?: string | null }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -174,8 +174,12 @@ function F1Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
       setDevices(devRes.data ?? [])
       setContacts(conRes.data ?? [])
       setLoading(false)
+      // Barkoddan gelindiyse pre-select
+      if (preselectedDeviceId) {
+        setSelectedDeviceId(preselectedDeviceId)
+      }
     })
-  }, [open])
+  }, [open, preselectedDeviceId])
 
   const grouped = useMemo(() => {
     return devices.reduce<Record<string, InStockDevice[]>>((acc, d) => {
@@ -263,7 +267,7 @@ function F1Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
                 <select id="f1m_invoice_type" name="invoice_type"
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
                   <option value="">Seçiniz (opsiyonel)</option>
-                  <option value="AF">Alış Faturası (AF)</option>
+                  <option value="AF">Ada Fatura (AF)</option>
                   <option value="MF">Müşteri Faturası (MF)</option>
                 </select>
               </div>
@@ -547,7 +551,7 @@ function F3Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 // ─── F4 Modal — Aksesuar Satışı ───────────────────────────────────────────────
 
-function F4Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function F4Modal({ open, onClose, preselectedBarcode }: { open: boolean; onClose: () => void; preselectedBarcode?: string | null }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -569,6 +573,13 @@ function F4Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
         setLoading(false)
       })
   }, [open])
+
+  // Pre-select barcode from F5
+  const [selectedBarcode, setSelectedBarcode] = useState("")
+  useEffect(() => {
+    if (open && preselectedBarcode) setSelectedBarcode(preselectedBarcode)
+    if (!open) setSelectedBarcode("")
+  }, [open, preselectedBarcode])
 
   async function handleSubmit(formData: FormData) {
     setError(null)
@@ -594,6 +605,8 @@ function F4Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
             <div className="space-y-1">
               <Label htmlFor="f4m_accessory_barcode">Aksesuar *</Label>
               <select id="f4m_accessory_barcode" name="accessory_barcode" required
+                value={selectedBarcode}
+                onChange={(e) => setSelectedBarcode(e.target.value)}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
                 <option value="">Aksesuar seçin...</option>
                 {accessories.map((a) => (
@@ -621,11 +634,219 @@ function F4Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 // ─── Help + Provider ──────────────────────────────────────────────────────────
 
+// ─── F5 Modal — Barkod Okuyucu ────────────────────────────────────────────────
+
+type BarcodeResult =
+  | { type: "device"; data: Record<string, unknown> }
+  | { type: "accessory"; data: Record<string, unknown> }
+  | null
+
+function F5Modal({
+  open,
+  onClose,
+  onOpenF1,
+  onOpenF4,
+}: {
+  open: boolean
+  onClose: () => void
+  onOpenF1: (deviceId: string) => void
+  onOpenF4: (barcode: string) => void
+}) {
+  const [barcodeInput, setBarcodeInput] = useState("")
+  const [result, setResult] = useState<BarcodeResult>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (open) {
+      setBarcodeInput("")
+      setResult(null)
+      setError(null)
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }, [open])
+
+  async function lookup(code: string) {
+    if (!code.trim()) return
+    setLoading(true)
+    setError(null)
+    setResult(null)
+    try {
+      const res = await fetch(`/api/barcode/${encodeURIComponent(code.trim())}`)
+      if (!res.ok) {
+        const body = await res.json()
+        setError(body.error ?? "Barkod bulunamadı")
+      } else {
+        const body = await res.json()
+        setResult(body)
+      }
+    } catch {
+      setError("Bağlantı hatası")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      lookup(barcodeInput)
+    }
+  }
+
+  function formatPrice(v: number) {
+    return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(v)
+  }
+
+  function Row({ label, value }: { label: string; value: React.ReactNode }) {
+    return (
+      <div className="flex justify-between items-center gap-2 text-sm">
+        <span className="text-muted-foreground shrink-0">{label}</span>
+        <span className="font-medium text-right">{value}</span>
+      </div>
+    )
+  }
+
+  const deviceData = result?.type === "device" ? result.data : null
+  const accessoryData = result?.type === "accessory" ? result.data : null
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>F5 — Barkod Okuyucu</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 mt-2">
+          {/* Input */}
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={barcodeInput}
+              onChange={(e) => setBarcodeInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Barkod okutun veya yazın..."
+              className="flex h-9 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+            />
+            <Button
+              size="sm"
+              onClick={() => lookup(barcodeInput)}
+              disabled={loading || !barcodeInput.trim()}
+            >
+              {loading ? "..." : "Ara"}
+            </Button>
+          </div>
+
+          {error && (
+            <div className="rounded-md bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
+          {/* Device result */}
+          {deviceData && (
+            <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-semibold text-base">
+                    {String(deviceData.brand)} {String(deviceData.model)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {String(deviceData.color)} · {String(deviceData.storage)}
+                  </p>
+                </div>
+                <span className="rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 text-xs font-medium">
+                  Cihaz
+                </span>
+              </div>
+
+              <div className="space-y-1.5 border-t border-border pt-3">
+                <Row label="Durum" value={deviceData.is_new ? "Sıfır" : "İkinci El"} />
+                <Row label="Kutu" value={deviceData.has_box ? "✓ Var" : "✗ Yok"} />
+                <Row label="Fatura" value={deviceData.has_invoice ? "✓ Var" : "✗ Yok"} />
+                {deviceData.warranty_months ? <Row label="Garanti" value={`${deviceData.warranty_months} ay`} /> : null}
+                {deviceData.battery_health != null ? (
+                  <Row label="Pil" value={
+                    <span className={
+                      Number(deviceData.battery_health) >= 80 ? "text-green-600 font-semibold" :
+                      Number(deviceData.battery_health) >= 50 ? "text-yellow-600 font-semibold" :
+                      "text-destructive font-semibold"
+                    }>{String(deviceData.battery_health)}%</span>
+                  } />
+                ) : null}
+                {deviceData.imei_1 ? <Row label="IMEI 1" value={<span className="font-mono text-xs">{String(deviceData.imei_1)}</span>} /> : null}
+              </div>
+
+              <div className="space-y-1.5 border-t border-border pt-3">
+                <Row label="Alış Fiyatı" value={formatPrice(Number(deviceData.purchase_price))} />
+                {Number(deviceData.total_expenses) > 0 && (
+                  <Row label="Masraflar" value={<span className="text-orange-600">+{formatPrice(Number(deviceData.total_expenses))}</span>} />
+                )}
+                <Row label="Net Maliyet" value={<span className="font-semibold">{formatPrice(Number(deviceData.net_cost_to_us))}</span>} />
+                {deviceData.recommended_sale_price != null && (
+                  <Row label="Vitrin Fiyatı" value={formatPrice(Number(deviceData.recommended_sale_price))} />
+                )}
+              </div>
+
+              <Button
+                className="w-full mt-2"
+                onClick={() => {
+                  onClose()
+                  onOpenF1(String(deviceData.device_id))
+                }}
+              >
+                Bu Cihazı Sat (F1)
+              </Button>
+            </div>
+          )}
+
+          {/* Accessory result */}
+          {accessoryData && (
+            <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-semibold text-base">
+                    {[accessoryData.brand, accessoryData.category].filter(Boolean).join(" / ") || "Aksesuar"}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{String(accessoryData.barcode)}</p>
+                </div>
+                <span className="rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-0.5 text-xs font-medium">
+                  Aksesuar
+                </span>
+              </div>
+
+              <div className="space-y-1.5 border-t border-border pt-3">
+                <Row label="Stok" value={`${accessoryData.stock_quantity} adet`} />
+                <Row label="Alış Fiyatı" value={formatPrice(Number(accessoryData.purchase_price))} />
+                <Row label="Satış Fiyatı" value={<span className="font-semibold">{formatPrice(Number(accessoryData.sale_price))}</span>} />
+              </div>
+
+              <Button
+                className="w-full mt-2"
+                disabled={Number(accessoryData.stock_quantity) === 0}
+                onClick={() => {
+                  onClose()
+                  onOpenF4(String(accessoryData.barcode))
+                }}
+              >
+                {Number(accessoryData.stock_quantity) === 0 ? "Stok Yok" : "Bu Aksesuarı Sat (F4)"}
+              </Button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 const SHORTCUTS = [
   { key: "N / F1", label: "F1 Cihaz Satışı (modal)" },
   { key: "F2", label: "F2 Cihaz Alışı (modal)" },
   { key: "F3", label: "F3 Aksesuar Alışı (modal)" },
   { key: "F4", label: "F4 Aksesuar Satışı (modal)" },
+  { key: "F5", label: "F5 Barkod Okuyucu (modal)" },
   { key: "D", label: "Cihazlar sayfası" },
   { key: "A", label: "Aksesuarlar sayfası" },
   { key: "?", label: "Bu yardım" },
@@ -634,6 +855,10 @@ const SHORTCUTS = [
 export function KeyboardShortcutsProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [openModal, setOpenModal] = useState<ModalKey | null>(null)
+  // F1'i barkoddan açarken pre-select için device id
+  const [f1PreselectedDeviceId, setF1PreselectedDeviceId] = useState<string | null>(null)
+  // F4'ü barkoddan açarken pre-select için barcode
+  const [f4PreselectedBarcode, setF4PreselectedBarcode] = useState<string | null>(null)
 
   const shortcuts = useMemo(
     () => ({
@@ -648,21 +873,42 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
       F2: () => setOpenModal("f2"),
       F3: () => setOpenModal("f3"),
       F4: () => setOpenModal("f4"),
+      F5: () => setOpenModal("f5"),
     }),
     [router]
   )
 
   useKeyboardShortcuts(shortcuts)
 
-  function close() { setOpenModal(null) }
+  function close() {
+    setOpenModal(null)
+    setF1PreselectedDeviceId(null)
+    setF4PreselectedBarcode(null)
+  }
+
+  function openF1FromBarcode(deviceId: string) {
+    setF1PreselectedDeviceId(deviceId)
+    setOpenModal("f1")
+  }
+
+  function openF4FromBarcode(barcode: string) {
+    setF4PreselectedBarcode(barcode)
+    setOpenModal("f4")
+  }
 
   return (
     <>
       {children}
-      <F1Modal open={openModal === "f1"} onClose={close} />
+      <F1Modal open={openModal === "f1"} onClose={close} preselectedDeviceId={f1PreselectedDeviceId} />
       <F2Modal open={openModal === "f2"} onClose={close} />
       <F3Modal open={openModal === "f3"} onClose={close} />
-      <F4Modal open={openModal === "f4"} onClose={close} />
+      <F4Modal open={openModal === "f4"} onClose={close} preselectedBarcode={f4PreselectedBarcode} />
+      <F5Modal
+        open={openModal === "f5"}
+        onClose={close}
+        onOpenF1={openF1FromBarcode}
+        onOpenF4={openF4FromBarcode}
+      />
       <Dialog open={openModal === "help"} onOpenChange={(v) => !v && close()}>
         <DialogContent>
           <DialogHeader>

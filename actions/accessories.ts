@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { generateAccessoryBarcode } from "@/lib/barcode"
 
 export type ActionResult = { success: true } | { error: string }
 
@@ -63,7 +64,7 @@ export async function addAccessory(formData: FormData): Promise<ActionResult> {
     return { error: parsed.error.issues[0].message }
   }
 
-  const barcode = parsed.data.barcode || `ACC-${Date.now()}`
+  const barcode = parsed.data.barcode || generateAccessoryBarcode()
 
   const supabase = await createClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -44,7 +44,7 @@ const PAYMENT_LABELS: Record<PaymentMethod, string> = {
 }
 
 const INVOICE_LABELS: Record<InvoiceType, string> = {
-  AF: "Alış Faturası",
+  AF: "Ada Fatura",
   MF: "Müşteri Faturası",
 }
 
