@@ -255,7 +255,7 @@ export function SalesClient({
             </TableRow>
           ) : (
             sales.map((sale) => (
-              <TableRow key={sale.id}>
+              <TableRow key={sale.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/sales/${sale.id}`)}>
                 <TableCell className="text-sm">{formatDate(sale.sale_date)}</TableCell>
                 <TableCell className="font-medium">
                   {sale.product_name ?? (sale.device_id ? "Cihaz" : "—")}
@@ -285,7 +285,7 @@ export function SalesClient({
                   <Button
                     size="sm"
                     variant="destructive"
-                    onClick={() => { setDeleteError(null); setDeleteTarget(sale) }}
+                    onClick={(e) => { e.stopPropagation(); setDeleteError(null); setDeleteTarget(sale) }}
                   >
                     Sil
                   </Button>

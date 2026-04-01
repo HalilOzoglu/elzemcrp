@@ -34,6 +34,7 @@ export default async function NewSalePage({ searchParams }: NewSalePageProps) {
     accessoriesResult.data ?? []
   const brands: Brand[] = brandsResult.data ?? []
   const models: Model[] = modelsResult.data ?? []
+  const suppliers: Pick<Contact, "id" | "full_name">[] = (contactsResult.data ?? [])
 
   return (
     <div className="space-y-6">
@@ -45,6 +46,7 @@ export default async function NewSalePage({ searchParams }: NewSalePageProps) {
         brands={brands}
         models={models}
         defaultTab={tab}
+        suppliers={suppliers}
       />
     </div>
   )

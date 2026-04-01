@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { createClient } from "@/lib/supabase/client"
 import { addDevice, updateDevice, deleteDevice } from "@/actions/devices"
-import type { InStockDevice, Brand, Model } from "@/lib/supabase/types"
+import type { InStockDevice, Brand, Model, Contact } from "@/lib/supabase/types"
 
 interface DevicesClientProps {
   devices: InStockDevice[]
@@ -43,6 +43,7 @@ interface DevicesClientProps {
   activeCondition: string
   activeForeign: boolean
   activeQ: string
+  suppliers: Pick<Contact, "id" | "full_name">[]
 }
 
 function formatPrice(price: number | null): string {
@@ -89,19 +90,20 @@ interface AddDialogProps {
   onOpenChange: (v: boolean) => void
   brands: Brand[]
   models: Model[]
+  suppliers: Pick<Contact, "id" | "full_name">[]
   onAdd: (formData: FormData) => Promise<void>
   error: string | null
 }
 
-function AddDeviceDialog({ open, onOpenChange, brands, models, onAdd, error }: AddDialogProps) {
+function AddDeviceDialog({ open, onOpenChange, brands, models, suppliers, onAdd, error }: AddDialogProps) {
   const [selectedBrandId, setSelectedBrandId] = useState("")
   const [selectedModelId, setSelectedModelId] = useState("")
   const [isDualSim, setIsDualSim] = useState(false)
-  const [isNew, setIsNew] = useState(true)
+  const [isNew, setIsNew] = useState<boolean | null>(null)
   const [isForeign, setIsForeign] = useState(false)
-  const [hasBox, setHasBox] = useState(true)
+  const [hasBox, setHasBox] = useState(false)
   const [hasInvoice, setHasInvoice] = useState(false)
-  const [warrantyMonths, setWarrantyMonths] = useState("24")
+  const [warrantyMonths, setWarrantyMonths] = useState("0")
   const [colorOptions, setColorOptions] = useState<string[]>([])
   const [storageOptions, setStorageOptions] = useState<string[]>([])
 
@@ -130,8 +132,8 @@ function AddDeviceDialog({ open, onOpenChange, brands, models, onAdd, error }: A
   function handleOpenChange(v: boolean) {
     if (!v) {
       setSelectedBrandId(""); setSelectedModelId("")
-      setIsDualSim(false); setIsNew(true); setIsForeign(false)
-      setHasBox(true); setHasInvoice(false); setWarrantyMonths("24")
+      setIsDualSim(false); setIsNew(null); setIsForeign(false)
+      setHasBox(false); setHasInvoice(false); setWarrantyMonths("0")
       setColorOptions([]); setStorageOptions([])
     }
     onOpenChange(v)
@@ -145,6 +147,7 @@ function AddDeviceDialog({ open, onOpenChange, brands, models, onAdd, error }: A
         </DialogHeader>
         <form
           action={async (fd) => {
+            if (isNew === null) return
             fd.set("is_dual_sim", isDualSim ? "true" : "false")
             fd.set("is_new", isNew ? "true" : "false")
             fd.set("is_foreign", isForeign ? "true" : "false")
@@ -192,6 +195,31 @@ function AddDeviceDialog({ open, onOpenChange, brands, models, onAdd, error }: A
           </div>
           <CheckboxField id="add_is_dual_sim" name="is_dual_sim" label="Çift SIM" checked={isDualSim} onChange={setIsDualSim} />
           <div className="space-y-1">
+            <Label>Cihaz Durumu *</Label>
+            <div className="flex gap-3">
+              <button type="button"
+                onClick={() => handleIsNewChange(true)}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${isNew === true ? "bg-primary text-primary-foreground border-primary" : "border-input bg-background hover:bg-muted"}`}>
+                Sıfır
+              </button>
+              <button type="button"
+                onClick={() => handleIsNewChange(false)}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${isNew === false ? "bg-primary text-primary-foreground border-primary" : "border-input bg-background hover:bg-muted"}`}>
+                İkinci El
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="add_supplier_id">Tedarikçi / Alınan Kişi</Label>
+            <select id="add_supplier_id" name="supplier_id"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+              <option value="">Perakende (cari seçilmedi)</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.full_name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
             <Label htmlFor="add_purchase_price">Alış Fiyatı (₺) *</Label>
             <Input id="add_purchase_price" name="purchase_price" type="number" min="0.01" step="0.01" placeholder="0.00" required />
           </div>
@@ -209,7 +237,6 @@ function AddDeviceDialog({ open, onOpenChange, brands, models, onAdd, error }: A
               <Input id="add_imei_2" name="imei_2" placeholder="15 haneli IMEI (opsiyonel)" maxLength={15} />
             </div>
           )}
-          <CheckboxField id="add_is_new" name="is_new" label="Sıfır cihaz" checked={isNew} onChange={handleIsNewChange} />
           <CheckboxField id="add_is_foreign" name="is_foreign" label="Yabancı menşei" checked={isForeign} onChange={setIsForeign} />
           <CheckboxField id="add_has_box" name="has_box" label="Kutu var" checked={hasBox} onChange={setHasBox} />
           <CheckboxField id="add_has_invoice" name="has_invoice" label="Fatura var" checked={hasInvoice} onChange={setHasInvoice} />
@@ -225,9 +252,9 @@ function AddDeviceDialog({ open, onOpenChange, brands, models, onAdd, error }: A
               <Label htmlFor="add_battery_health">Pil Durumu (%)</Label>
               <Input
                 id="add_battery_health" name="battery_health" type="number" min="0" max="100"
-                placeholder={isNew ? "100 (otomatik)" : "0-100"}
-                disabled={isNew}
-                defaultValue={isNew ? "100" : ""}
+                placeholder={isNew === true ? "100 (otomatik)" : "0-100"}
+                disabled={isNew === true}
+                defaultValue={isNew === true ? "100" : ""}
               />
             </div>
             <div className="space-y-1">
@@ -299,6 +326,16 @@ function EditDeviceDialog({ device, open, onOpenChange, onSave, error }: EditDia
           }}
           className="space-y-4 mt-2"
         >
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="edit_color">Renk *</Label>
+              <Input id="edit_color" name="color" defaultValue={device.color} placeholder="Siyah" required />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit_storage">Hafıza *</Label>
+              <Input id="edit_storage" name="storage" defaultValue={device.storage} placeholder="128GB" required />
+            </div>
+          </div>
           <div className="space-y-1">
             <Label htmlFor="edit_purchase_price">Alış Fiyatı (₺) *</Label>
             <Input id="edit_purchase_price" name="purchase_price" type="number" min="0.01" step="0.01" defaultValue={device.purchase_price} required />
@@ -365,6 +402,7 @@ export function DevicesClient({
   activeCondition,
   activeForeign,
   activeQ,
+  suppliers,
 }: DevicesClientProps) {
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -660,6 +698,7 @@ export function DevicesClient({
         onOpenChange={setAddOpen}
         brands={brands}
         models={models}
+        suppliers={suppliers}
         onAdd={handleAdd}
         error={addError}
       />

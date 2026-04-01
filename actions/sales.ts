@@ -240,3 +240,39 @@ export async function deleteSale(saleId: string): Promise<ActionResult> {
 
   return { success: true }
 }
+
+// ─── updateSale ───────────────────────────────────────────────────────────────
+
+export async function updateSale(saleId: string, formData: FormData): Promise<ActionResult> {
+  const payment_method = (formData.get("payment_method") as string) || null
+  const invoice_type = (formData.get("invoice_type") as string) || null
+  const customer_id = (formData.get("contact_id") as string) || null
+  const sale_price_raw = formData.get("sale_price") as string
+  const sale_price = parseFloat(sale_price_raw)
+
+  if (!sale_price_raw || isNaN(sale_price) || sale_price <= 0) {
+    return { error: "Geçerli bir satış fiyatı girin." }
+  }
+
+  const supabase = await createClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from("sales")
+    .update({
+      sale_price,
+      payment_method: payment_method || null,
+      invoice_type: invoice_type || null,
+      customer_id: customer_id || null,
+      // AF seçilince bekliyor, diğer durumlarda null
+      af_status: invoice_type === "AF" ? "PENDING" : null,
+    })
+    .eq("id", saleId)
+
+  if (error) {
+    return { error: "Satış güncellenirken bir hata oluştu." }
+  }
+
+  revalidatePath("/sales")
+  revalidatePath("/")
+  return { success: true }
+}

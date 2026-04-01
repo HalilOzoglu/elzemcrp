@@ -35,6 +35,7 @@ interface NewSaleClientProps {
   brands: Brand[]
   models: Model[]
   defaultTab?: string
+  suppliers: Pick<Contact, "id" | "full_name">[]
 }
 
 const PAYMENT_LABELS: Record<PaymentMethod, string> = {
@@ -225,18 +226,18 @@ function DeviceSaleForm({ devices, contacts }: {
 
 // ─── F2: Device Purchase ──────────────────────────────────────────────────────
 
-function DevicePurchaseForm({ brands, models }: { brands: Brand[]; models: Model[] }) {
+function DevicePurchaseForm({ brands, models, suppliers }: { brands: Brand[]; models: Model[]; suppliers: Pick<Contact, "id" | "full_name">[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [selectedBrandId, setSelectedBrandId] = useState("")
   const [selectedModelId, setSelectedModelId] = useState("")
   const [isDualSim, setIsDualSim] = useState(false)
-  const [isNew, setIsNew] = useState(true)
+  const [isNew, setIsNew] = useState<boolean | null>(null)
   const [isForeign, setIsForeign] = useState(false)
-  const [hasBox, setHasBox] = useState(true)
+  const [hasBox, setHasBox] = useState(false)
   const [hasInvoice, setHasInvoice] = useState(false)
-  const [warrantyMonths, setWarrantyMonths] = useState("24")
+  const [warrantyMonths, setWarrantyMonths] = useState("0")
   const [colorOptions, setColorOptions] = useState<string[]>([])
   const [storageOptions, setStorageOptions] = useState<string[]>([])
 
@@ -264,6 +265,7 @@ function DevicePurchaseForm({ brands, models }: { brands: Brand[]; models: Model
   }
 
   async function handleSubmit(formData: FormData) {
+    if (isNew === null) { setError("Cihaz durumu seçiniz (Sıfır / İkinci El)"); return }
     setError(null)
     formData.set("is_dual_sim", isDualSim ? "true" : "false")
     formData.set("is_new", isNew ? "true" : "false")
@@ -317,6 +319,31 @@ function DevicePurchaseForm({ brands, models }: { brands: Brand[]; models: Model
         </div>
       </div>
       <div className="space-y-1">
+        <Label>Cihaz Durumu *</Label>
+        <div className="flex gap-3">
+          <button type="button"
+            onClick={() => handleIsNewChange(true)}
+            className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${isNew === true ? "bg-primary text-primary-foreground border-primary" : "border-input bg-background hover:bg-muted"}`}>
+            Sıfır
+          </button>
+          <button type="button"
+            onClick={() => handleIsNewChange(false)}
+            className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${isNew === false ? "bg-primary text-primary-foreground border-primary" : "border-input bg-background hover:bg-muted"}`}>
+            İkinci El
+          </button>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="f2_supplier_id">Tedarikçi / Alınan Kişi</Label>
+        <select id="f2_supplier_id" name="supplier_id"
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+          <option value="">Perakende (cari seçilmedi)</option>
+          {suppliers.map((s) => (
+            <option key={s.id} value={s.id}>{s.full_name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="space-y-1">
         <Label htmlFor="f2_purchase_price">Alış Fiyatı (₺) *</Label>
         <Input id="f2_purchase_price" name="purchase_price" type="number" min="0.01" step="0.01" placeholder="0.00" required />
       </div>
@@ -331,11 +358,10 @@ function DevicePurchaseForm({ brands, models }: { brands: Brand[]; models: Model
       <CheckboxField id="f2_is_dual_sim" name="is_dual_sim" label="Çift SIM" checked={isDualSim} onChange={setIsDualSim} />
       {isDualSim && (
         <div className="space-y-1">
-          <Label htmlFor="f2_imei_2">IMEI 2 *</Label>
-          <Input id="f2_imei_2" name="imei_2" placeholder="15 haneli IMEI (zorunlu)" maxLength={15} required />
+          <Label htmlFor="f2_imei_2">IMEI 2</Label>
+          <Input id="f2_imei_2" name="imei_2" placeholder="15 haneli IMEI (opsiyonel)" maxLength={15} />
         </div>
       )}
-      <CheckboxField id="f2_is_new" name="is_new" label="Sıfır cihaz" checked={isNew} onChange={handleIsNewChange} />
       <CheckboxField id="f2_is_foreign" name="is_foreign" label="Yabancı menşei" checked={isForeign} onChange={setIsForeign} />
       <CheckboxField id="f2_has_box" name="has_box" label="Kutu var" checked={hasBox} onChange={setHasBox} />
       <CheckboxField id="f2_has_invoice" name="has_invoice" label="Fatura var" checked={hasInvoice} onChange={setHasInvoice} />
@@ -506,7 +532,7 @@ function AccessorySaleForm({ accessories }: {
 
 // ─── Main Client Component ────────────────────────────────────────────────────
 
-export function NewSaleClient({ devices, contacts, accessories, brands, models, defaultTab }: NewSaleClientProps) {
+export function NewSaleClient({ devices, contacts, accessories, brands, models, defaultTab, suppliers }: NewSaleClientProps) {
   const validTabs = ["f1", "f2", "f3", "f4"]
   const activeTab = defaultTab && validTabs.includes(defaultTab) ? defaultTab : "f1"
 
@@ -528,7 +554,7 @@ export function NewSaleClient({ devices, contacts, accessories, brands, models, 
       </TabsContent>
 
       <TabsContent value="f2" className="pt-6">
-        <DevicePurchaseForm brands={brands} models={models} />
+        <DevicePurchaseForm brands={brands} models={models} suppliers={suppliers} />
       </TabsContent>
 
       <TabsContent value="f3" className="pt-6">

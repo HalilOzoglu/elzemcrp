@@ -309,16 +309,17 @@ function F2Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const [brands, setBrands] = useState<Brand[]>([])
   const [models, setModels] = useState<Model[]>([])
+  const [suppliers, setSuppliers] = useState<Pick<Contact, "id" | "full_name">[]>([])
   const [loading, setLoading] = useState(false)
 
   const [selectedBrandId, setSelectedBrandId] = useState("")
   const [selectedModelId, setSelectedModelId] = useState("")
   const [isDualSim, setIsDualSim] = useState(false)
-  const [isNew, setIsNew] = useState(true)
+  const [isNew, setIsNew] = useState<boolean | null>(null)
   const [isForeign, setIsForeign] = useState(false)
-  const [hasBox, setHasBox] = useState(true)
+  const [hasBox, setHasBox] = useState(false)
   const [hasInvoice, setHasInvoice] = useState(false)
-  const [warrantyMonths, setWarrantyMonths] = useState("24")
+  const [warrantyMonths, setWarrantyMonths] = useState("0")
   const [colorOptions, setColorOptions] = useState<string[]>([])
   const [storageOptions, setStorageOptions] = useState<string[]>([])
 
@@ -331,9 +332,12 @@ function F2Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
       (supabase as any).from("brands").select("*").order("name"),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase as any).from("models").select("*").order("name"),
-    ]).then(([bRes, mRes]) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any).from("contacts").select("id, full_name").order("full_name"),
+    ]).then(([bRes, mRes, sRes]) => {
       setBrands(bRes.data ?? [])
       setModels(mRes.data ?? [])
+      setSuppliers(sRes.data ?? [])
       setLoading(false)
     })
   }, [open])
@@ -360,8 +364,8 @@ function F2Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   function handleClose() {
     setSelectedBrandId(""); setSelectedModelId("")
-    setIsDualSim(false); setIsNew(true); setIsForeign(false)
-    setHasBox(true); setHasInvoice(false); setWarrantyMonths("24")
+    setIsDualSim(false); setIsNew(null); setIsForeign(false)
+    setHasBox(false); setHasInvoice(false); setWarrantyMonths("0")
     setColorOptions([]); setStorageOptions([])
     setError(null)
     onClose()
@@ -370,6 +374,7 @@ function F2Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const filteredModels = models.filter((m) => m.brand_id === selectedBrandId)
 
   async function handleSubmit(formData: FormData) {
+    if (isNew === null) { setError("Cihaz durumu seçiniz (Sıfır / İkinci El)"); return }
     setError(null)
     formData.set("is_dual_sim", isDualSim ? "true" : "false")
     formData.set("is_new", isNew ? "true" : "false")
@@ -431,6 +436,31 @@ function F2Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
                 </datalist>
               </div>
             </div>
+            <div className="space-y-1">
+              <Label>Cihaz Durumu *</Label>
+              <div className="flex gap-3">
+                <button type="button"
+                  onClick={() => handleIsNewChange(true)}
+                  className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${isNew === true ? "bg-primary text-primary-foreground border-primary" : "border-input bg-background hover:bg-muted"}`}>
+                  Sıfır
+                </button>
+                <button type="button"
+                  onClick={() => handleIsNewChange(false)}
+                  className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${isNew === false ? "bg-primary text-primary-foreground border-primary" : "border-input bg-background hover:bg-muted"}`}>
+                  İkinci El
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="f2m_supplier_id">Tedarikçi / Alınan Kişi</Label>
+              <select id="f2m_supplier_id" name="supplier_id"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                <option value="">Perakende (cari seçilmedi)</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.full_name}</option>
+                ))}
+              </select>
+            </div>
             <CheckboxField id="f2m_is_dual_sim" name="is_dual_sim" label="Çift SIM" checked={isDualSim} onChange={setIsDualSim} />
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -448,11 +478,10 @@ function F2Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
             </div>
             {isDualSim && (
               <div className="space-y-1">
-                <Label htmlFor="f2m_imei_2">IMEI 2 *</Label>
-                <Input id="f2m_imei_2" name="imei_2" placeholder="15 haneli IMEI (zorunlu)" maxLength={15} required />
+                <Label htmlFor="f2m_imei_2">IMEI 2</Label>
+                <Input id="f2m_imei_2" name="imei_2" placeholder="15 haneli IMEI (opsiyonel)" maxLength={15} />
               </div>
             )}
-            <CheckboxField id="f2m_is_new" name="is_new" label="Sıfır cihaz" checked={isNew} onChange={handleIsNewChange} />
             <CheckboxField id="f2m_is_foreign" name="is_foreign" label="Yabancı menşei" checked={isForeign} onChange={setIsForeign} />
             <CheckboxField id="f2m_has_box" name="has_box" label="Kutu var" checked={hasBox} onChange={setHasBox} />
             <CheckboxField id="f2m_has_invoice" name="has_invoice" label="Fatura var" checked={hasInvoice} onChange={setHasInvoice} />
@@ -468,8 +497,8 @@ function F2Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
                 <Label htmlFor="f2m_battery_health">Pil Durumu (%)</Label>
                 <Input
                   id="f2m_battery_health" name="battery_health" type="number" min="0" max="100"
-                  placeholder={isNew ? "100 (otomatik)" : "0-100"}
-                  disabled={isNew}
+                  placeholder={isNew === true ? "100 (otomatik)" : "0-100"}
+                  disabled={isNew === true}
                 />
               </div>
             </div>

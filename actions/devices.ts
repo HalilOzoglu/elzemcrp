@@ -82,15 +82,16 @@ const addDeviceSchema = z
       .optional()
       .transform((v) => (v && v.trim() !== "" ? parseInt(v, 10) : null))
       .refine((v) => v === null || (!isNaN(v) && v >= 0 && v <= 100), "Pil durumu 0-100 arasında olmalıdır"),
+    supplier_id: z.string().optional().transform((v) => (v && v.trim() !== "" ? v.trim() : null)),
   })
   .superRefine((data, ctx) => {
     validateImeis(data.imei1 ?? null, data.imei2 ?? null, data.is_dual_sim, ctx)
   })
 
-// ─── updateDevice Schema ──────────────────────────────────────────────────────
-
 const updateDeviceSchema = z
   .object({
+    color: z.string().min(1, "Renk zorunludur"),
+    storage: z.string().min(1, "Hafıza zorunludur"),
     purchase_price: z
       .string()
       .min(1, "Alış fiyatı zorunludur")
@@ -144,6 +145,7 @@ export async function addDevice(formData: FormData): Promise<ActionResult> {
     warranty_months: (formData.get("warranty_months") as string) ?? "",
     barcode: (formData.get("barcode") as string) ?? "",
     battery_health: (formData.get("battery_health") as string) ?? "",
+    supplier_id: (formData.get("supplier_id") as string) ?? "",
   }
 
   const parsed = addDeviceSchema.safeParse(raw)
@@ -165,6 +167,7 @@ export async function addDevice(formData: FormData): Promise<ActionResult> {
     has_box,
     has_invoice,
     barcode,
+    supplier_id,
   } = parsed.data
 
   // Sıfır cihazda garanti otomatik 24 ay
@@ -207,6 +210,7 @@ export async function addDevice(formData: FormData): Promise<ActionResult> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from("devices") as any).insert({
     variant_id: variantId,
+    supplier_id: supplier_id ?? null,
     purchase_price,
     recommended_sale_price: display_price,
     imei_1: imei1,
@@ -240,6 +244,8 @@ export async function updateDevice(
   formData: FormData
 ): Promise<ActionResult> {
   const raw = {
+    color: (formData.get("color") as string) ?? "",
+    storage: (formData.get("storage") as string) ?? "",
     purchase_price: formData.get("purchase_price") as string,
     recommended_sale_price: (formData.get("recommended_sale_price") as string) ?? "",
     imei_1: (formData.get("imei_1") as string) ?? "",
@@ -269,13 +275,54 @@ export async function updateDevice(
   const battery_health = parsed.data.is_new ? 100 : (parsed.data.battery_health ?? null)
 
   const supabase = await createClient()
+
+  // Renk/hafıza değiştiyse variant güncelle veya yeni oluştur
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: currentDevice } = await (supabase as any)
+    .from("devices")
+    .select("variant_id, model_variants:variant_id(model_id, color, storage)")
+    .eq("id", deviceId)
+    .single()
+
+  if (currentDevice?.model_variants) {
+    const { model_id, color: currentColor, storage: currentStorage } = currentDevice.model_variants
+    if (parsed.data.color !== currentColor || parsed.data.storage !== currentStorage) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: existingVariant } = await (supabase as any)
+        .from("model_variants")
+        .select("id")
+        .eq("model_id", model_id)
+        .eq("color", parsed.data.color)
+        .eq("storage", parsed.data.storage)
+        .maybeSingle()
+
+      let newVariantId: string
+      if (existingVariant) {
+        newVariantId = existingVariant.id
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: newVariant, error: variantError } = await (supabase as any)
+          .from("model_variants")
+          .insert({ model_id, color: parsed.data.color, storage: parsed.data.storage })
+          .select("id")
+          .single()
+        if (variantError || !newVariant) {
+          return { error: "Varyant oluşturulurken bir hata oluştu." }
+        }
+        newVariantId = newVariant.id
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("devices").update({ variant_id: newVariantId }).eq("id", deviceId)
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from("devices") as any)
     .update({
       purchase_price: parsed.data.purchase_price,
       recommended_sale_price: parsed.data.recommended_sale_price,
       imei_1: parsed.data.imei_1,
-      imei_2: parsed.data.is_dual_sim ? parsed.data.imei_2 : null,  // Tek SIM ise her zaman null
+      imei_2: parsed.data.is_dual_sim ? parsed.data.imei_2 : null,
       is_dual_sim: parsed.data.is_dual_sim,
       is_new: parsed.data.is_new,
       is_foreign: parsed.data.is_foreign,

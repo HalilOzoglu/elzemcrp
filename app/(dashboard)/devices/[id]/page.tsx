@@ -50,7 +50,8 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
           variant:model_variants(
             id, color, storage,
             model:models(id, name, brand:brands(id, name))
-          )
+          ),
+          supplier:contacts!supplier_id(id, full_name)
         `)
         .eq("id", id)
         .single(),
@@ -70,6 +71,7 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
 
   const device = deviceResult.data as Device & {
     variant: ModelVariant & { model: Model & { brand: Brand } }
+    supplier: { id: string; full_name: string } | null
   }
   const totalCost: number = totalCostResult.data ?? 0
   const netProfit: number = netProfitResult.data ?? 0
@@ -103,6 +105,8 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
           <DeviceEditDialog
             deviceId={id}
             device={{
+              color,
+              storage,
               purchase_price: device.purchase_price,
               recommended_sale_price: device.recommended_sale_price,
               imei_1: device.imei_1,
@@ -138,6 +142,7 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
           <div><span className="text-muted-foreground">Barkod:</span> <span className="font-mono font-medium">{device.barcode ?? "—"}</span></div>
           <div><span className="text-muted-foreground">Pil Durumu:</span> <span className="font-medium">{device.battery_health != null ? `${device.battery_health}%` : "—"}</span></div>
           <div><span className="text-muted-foreground">Durum:</span> <span className="font-medium">{STATUS_LABELS[device.status] ?? device.status}</span></div>
+          <div><span className="text-muted-foreground">Tedarikçi:</span> <span className="font-medium">{device.supplier?.full_name ?? "Perakende"}</span></div>
         </div>
       </section>
 

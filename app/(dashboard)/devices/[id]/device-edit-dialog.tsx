@@ -17,6 +17,8 @@ import { updateDevice } from "@/actions/devices"
 interface DeviceEditDialogProps {
   deviceId: string
   device: {
+    color: string
+    storage: string
     purchase_price: number
     recommended_sale_price: number | null
     imei_1: string | null
@@ -77,7 +79,6 @@ export function DeviceEditDialog({ deviceId, device }: DeviceEditDialogProps) {
     setError(null)
     setOpen(true)
   }
-
   async function handleSubmit(formData: FormData) {
     setError(null)
     formData.set("is_dual_sim", isDualSim ? "true" : "false")
@@ -110,6 +111,16 @@ export function DeviceEditDialog({ deviceId, device }: DeviceEditDialogProps) {
             <DialogTitle>Cihaz Düzenle</DialogTitle>
           </DialogHeader>
           <form action={handleSubmit} className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="de_color">Renk *</Label>
+                <Input id="de_color" name="color" defaultValue={device.color} placeholder="Siyah" required />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="de_storage">Hafıza *</Label>
+                <Input id="de_storage" name="storage" defaultValue={device.storage} placeholder="128GB" required />
+              </div>
+            </div>
             <div className="space-y-1">
               <Label htmlFor="de_purchase_price">Alış Fiyatı (₺) *</Label>
               <Input id="de_purchase_price" name="purchase_price" type="number" min="0.01" step="0.01" defaultValue={device.purchase_price} required />
