@@ -196,3 +196,47 @@ export async function updateAfStatus(
 
   return { success: true }
 }
+
+// ─── deleteSale ───────────────────────────────────────────────────────────────
+
+export async function deleteSale(saleId: string): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  // Satışa bağlı cihazı bul
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sale, error: fetchError } = await (supabase as any)
+    .from("sales")
+    .select("id, device_id")
+    .eq("id", saleId)
+    .single()
+
+  if (fetchError || !sale) {
+    return { error: "Satış bulunamadı." }
+  }
+
+  // Satışı sil
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: deleteError } = await (supabase as any)
+    .from("sales")
+    .delete()
+    .eq("id", saleId)
+
+  if (deleteError) {
+    return { error: "Satış silinirken bir hata oluştu." }
+  }
+
+  // Cihaz varsa stoka geri al
+  if (sale.device_id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
+      .from("devices")
+      .update({ status: "IN_STOCK" })
+      .eq("id", sale.device_id)
+  }
+
+  revalidatePath("/sales")
+  revalidatePath("/devices")
+  revalidatePath("/")
+
+  return { success: true }
+}

@@ -255,6 +255,11 @@ function ModelsTab({ models, brands }: { models: ModelWithBrand[]; brands: Brand
   const [deleteTarget, setDeleteTarget] = useState<ModelWithBrand | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [filterBrandId, setFilterBrandId] = useState("")
+
+  const filteredModels = filterBrandId
+    ? optimisticModels.filter((m) => m.brand_id === filterBrandId)
+    : optimisticModels
 
   function openAdd() {
     setEditModel(null)
@@ -308,10 +313,22 @@ function ModelsTab({ models, brands }: { models: ModelWithBrand[]; brands: Brand
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-muted-foreground">
-          {optimisticModels.length} model
-        </h3>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-medium text-muted-foreground">
+            {filteredModels.length} model
+          </h3>
+          <select
+            value={filterBrandId}
+            onChange={(e) => setFilterBrandId(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option value="">Tüm Markalar</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </div>
         <Button size="sm" onClick={openAdd}>
           + Model Ekle
         </Button>
@@ -326,14 +343,14 @@ function ModelsTab({ models, brands }: { models: ModelWithBrand[]; brands: Brand
           </TableRow>
         </TableHeader>
         <TableBody>
-          {optimisticModels.length === 0 ? (
+          {filteredModels.length === 0 ? (
             <TableRow>
               <TableCell colSpan={4} className="text-center text-muted-foreground">
                 Henüz model eklenmemiş.
               </TableCell>
             </TableRow>
           ) : (
-            optimisticModels.map((model) => (
+            filteredModels.map((model) => (
               <TableRow key={model.id} className={model.id.startsWith("temp-") ? "opacity-60" : ""}>
                 <TableCell className="font-medium">{model.name}</TableCell>
                 <TableCell>{model.brand_name}</TableCell>

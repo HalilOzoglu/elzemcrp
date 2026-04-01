@@ -21,8 +21,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { createClient } from "@/lib/supabase/client"
-import { addDevice, updateDevice } from "@/actions/devices"
+import { addDevice, updateDevice, deleteDevice } from "@/actions/devices"
 import type { InStockDevice, Brand, Model } from "@/lib/supabase/types"
 
 interface DevicesClientProps {
@@ -195,8 +205,8 @@ function AddDeviceDialog({ open, onOpenChange, brands, models, onAdd, error }: A
           </div>
           {isDualSim && (
             <div className="space-y-1">
-              <Label htmlFor="add_imei_2">IMEI 2 *</Label>
-              <Input id="add_imei_2" name="imei_2" placeholder="15 haneli IMEI (zorunlu)" maxLength={15} required />
+              <Label htmlFor="add_imei_2">IMEI 2</Label>
+              <Input id="add_imei_2" name="imei_2" placeholder="15 haneli IMEI (opsiyonel)" maxLength={15} />
             </div>
           )}
           <CheckboxField id="add_is_new" name="is_new" label="Sıfır cihaz" checked={isNew} onChange={handleIsNewChange} />
@@ -304,8 +314,8 @@ function EditDeviceDialog({ device, open, onOpenChange, onSave, error }: EditDia
           <CheckboxField id="edit_is_dual_sim" name="is_dual_sim" label="Çift SIM" checked={isDualSim} onChange={setIsDualSim} />
           {isDualSim && (
             <div className="space-y-1">
-              <Label htmlFor="edit_imei_2">IMEI 2 *</Label>
-              <Input id="edit_imei_2" name="imei_2" defaultValue={device.imei_2 ?? ""} placeholder="15 haneli IMEI (zorunlu)" maxLength={15} required />
+              <Label htmlFor="edit_imei_2">IMEI 2</Label>
+              <Input id="edit_imei_2" name="imei_2" defaultValue={device.imei_2 ?? ""} placeholder="15 haneli IMEI (opsiyonel)" maxLength={15} />
             </div>
           )}
           <CheckboxField id="edit_is_new" name="is_new" label="Sıfır cihaz" checked={isNew} onChange={handleIsNewChange} />
@@ -365,11 +375,13 @@ export function DevicesClient({
     (state: InStockDevice[], action:
       | { type: "add"; item: InStockDevice }
       | { type: "update"; item: Partial<InStockDevice> & { device_id: string } }
+      | { type: "delete"; device_id: string }
     ) => {
       if (action.type === "add") return [action.item, ...state]
       if (action.type === "update") return state.map(d =>
         d.device_id === action.item.device_id ? { ...d, ...action.item } : d
       )
+      if (action.type === "delete") return state.filter(d => d.device_id !== action.device_id)
       return state
     }
   )
@@ -381,6 +393,8 @@ export function DevicesClient({
   const [editDevice, setEditDevice] = useState<InStockDevice | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<InStockDevice | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   function buildParams(overrides: Record<string, string | null>) {
     const params = new URLSearchParams()
@@ -489,6 +503,21 @@ export function DevicesClient({
     setEditError(null)
     setEditDevice(device)
     setEditOpen(true)
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleteError(null)
+    startTransition(() => {
+      dispatchOptimistic({ type: "delete", device_id: deleteTarget.device_id })
+    })
+    const result = await deleteDevice(deleteTarget.device_id)
+    if ("error" in result) {
+      setDeleteError(result.error)
+      return
+    }
+    setDeleteTarget(null)
+    router.refresh()
   }
 
   return (
@@ -606,9 +635,18 @@ export function DevicesClient({
                 <TableCell>{formatPrice(device.recommended_sale_price)}</TableCell>
                 <TableCell>
                   {!device.device_id.startsWith("temp-") && (
-                    <Button size="sm" variant="outline" onClick={(e) => openEdit(e, device)}>
-                      Düzenle
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={(e) => openEdit(e, device)}>
+                        Düzenle
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => { e.stopPropagation(); setDeleteError(null); setDeleteTarget(device) }}
+                      >
+                        Sil
+                      </Button>
+                    </div>
                   )}
                 </TableCell>
               </TableRow>
@@ -632,6 +670,26 @@ export function DevicesClient({
         onSave={handleEdit}
         error={editError}
       />
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cihazı Sil</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{deleteTarget?.brand} {deleteTarget?.model}</strong> ({deleteTarget?.color} / {deleteTarget?.storage}) cihazını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && <p className="text-sm text-destructive px-1">{deleteError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

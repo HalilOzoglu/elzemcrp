@@ -23,7 +23,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
     .order("device_id", { ascending: false })
 
   if (brand) {
-    devicesQuery = devicesQuery.eq("brand", brand)
+    devicesQuery = devicesQuery.ilike("brand", brand)
   }
   if (condition === "new") {
     devicesQuery = devicesQuery.eq("is_new", true)

@@ -26,15 +26,7 @@ function validateImeis(
     })
   }
 
-  // Çift SIM ise IMEI 2 zorunlu
-  if (isDualSim && !imei2) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["imei2"],
-      message: "Çift SIM cihazlarda IMEI 2 zorunludur",
-    })
-  }
-
+  // Çift SIM ise IMEI 2 opsiyonel (girilmişse format kontrolü yapılır)
   // IMEI 2 format kontrolü (girilmişse)
   if (imei2 && !/^\d{15}$/.test(imei2)) {
     ctx.addIssue({
@@ -366,5 +358,40 @@ export async function addDeviceExpense(
   }
 
   revalidatePath("/devices/" + deviceId)
+  return { success: true }
+}
+
+// ─── deleteDevice ─────────────────────────────────────────────────────────────
+
+export async function deleteDevice(deviceId: string): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  // Sadece stokta olan cihazlar silinebilir
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: device, error: fetchError } = await (supabase as any)
+    .from("devices")
+    .select("status")
+    .eq("id", deviceId)
+    .single()
+
+  if (fetchError || !device) {
+    return { error: "Cihaz bulunamadı." }
+  }
+
+  if (device.status !== "IN_STOCK") {
+    return { error: "Sadece stokta olan cihazlar silinebilir." }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from("devices")
+    .delete()
+    .eq("id", deviceId)
+
+  if (error) {
+    return { error: "Cihaz silinirken bir hata oluştu." }
+  }
+
+  revalidatePath("/devices")
   return { success: true }
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -11,6 +12,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { deleteSale } from "@/actions/sales"
 import type { PaymentMethod, InvoiceType } from "@/lib/supabase/types"
 import type { SaleRow } from "./page"
 
@@ -77,6 +89,20 @@ export function SalesClient({
   activeAfStatus,
 }: SalesClientProps) {
   const router = useRouter()
+  const [deleteTarget, setDeleteTarget] = useState<SaleRow | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleteError(null)
+    const result = await deleteSale(deleteTarget.id)
+    if ("error" in result) {
+      setDeleteError(result.error)
+      return
+    }
+    setDeleteTarget(null)
+    router.refresh()
+  }
 
   function buildParams(overrides: Record<string, string | null>) {
     const params = new URLSearchParams()
@@ -217,12 +243,13 @@ export function SalesClient({
             <TableHead>Ödeme Yöntemi</TableHead>
             <TableHead>Fatura Tipi</TableHead>
             <TableHead>AF Durumu</TableHead>
+            <TableHead></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {sales.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground">
+              <TableCell colSpan={8} className="text-center text-muted-foreground">
                 {hasFilters ? "Filtreye uyan satış bulunamadı." : "Henüz satış kaydı yok."}
               </TableCell>
             </TableRow>
@@ -254,11 +281,42 @@ export function SalesClient({
                     <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
+                <TableCell>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => { setDeleteError(null); setDeleteTarget(sale) }}
+                  >
+                    Sil
+                  </Button>
+                </TableCell>
               </TableRow>
             ))
           )}
         </TableBody>
       </Table>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Satışı Sil</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{deleteTarget?.product_name ?? "Bu satış"}</strong> kaydını silmek istediğinizden emin misiniz?
+              {deleteTarget?.device_id && " Cihaz stoka geri dönecektir."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && <p className="text-sm text-destructive px-1">{deleteError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
