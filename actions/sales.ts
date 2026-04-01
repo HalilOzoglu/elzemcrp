@@ -273,6 +273,7 @@ export async function updateSale(saleId: string, formData: FormData): Promise<Ac
   }
 
   revalidatePath("/sales")
+  revalidatePath("/sales/" + saleId)
   revalidatePath("/")
   return { success: true }
 }

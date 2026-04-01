@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useOptimistic, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -89,12 +89,21 @@ export function SalesClient({
   activeAfStatus,
 }: SalesClientProps) {
   const router = useRouter()
+  const [, startTransition] = useTransition()
   const [deleteTarget, setDeleteTarget] = useState<SaleRow | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const [optimisticSales, dispatchOptimistic] = useOptimistic(
+    sales,
+    (state: SaleRow[], deletedId: string) => state.filter((s) => s.id !== deletedId)
+  )
 
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleteError(null)
+    startTransition(() => {
+      dispatchOptimistic(deleteTarget.id)
+    })
     const result = await deleteSale(deleteTarget.id)
     if ("error" in result) {
       setDeleteError(result.error)
@@ -247,14 +256,14 @@ export function SalesClient({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sales.length === 0 ? (
+          {optimisticSales.length === 0 ? (
             <TableRow>
               <TableCell colSpan={8} className="text-center text-muted-foreground">
                 {hasFilters ? "Filtreye uyan satış bulunamadı." : "Henüz satış kaydı yok."}
               </TableCell>
             </TableRow>
           ) : (
-            sales.map((sale) => (
+            optimisticSales.map((sale) => (
               <TableRow key={sale.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/sales/${sale.id}`)}>
                 <TableCell className="text-sm">{formatDate(sale.sale_date)}</TableCell>
                 <TableCell className="font-medium">

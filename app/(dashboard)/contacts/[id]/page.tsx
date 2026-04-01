@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
 import { Badge } from "@/components/ui/badge"
 import type { Contact, Sale, ContactType, PaymentMethod, InvoiceType } from "@/lib/supabase/types"
@@ -60,6 +61,13 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
 
   return (
     <div className="space-y-8 max-w-3xl">
+      {/* Back link */}
+      <div>
+        <Link href="/contacts" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          ← Geri
+        </Link>
+      </div>
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -108,7 +116,7 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
         ) : (
           <div className="rounded-md border divide-y text-sm">
             {sales.map((sale) => (
-              <div key={sale.id} className="flex items-center justify-between px-4 py-3">
+              <Link key={sale.id} href={`/sales/${sale.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
                 <div className="space-y-0.5">
                   <p className="font-medium">{formatDate(sale.sale_date)}</p>
                   <div className="flex gap-2 text-xs text-muted-foreground">
@@ -124,7 +132,7 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
                   </div>
                 </div>
                 <span className="font-semibold">{formatPrice(sale.sale_price)}</span>
-              </div>
+              </Link>
             ))}
           </div>
         )}

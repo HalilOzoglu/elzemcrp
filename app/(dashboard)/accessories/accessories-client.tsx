@@ -21,8 +21,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { addAccessory, updateAccessory } from "@/actions/accessories"
+import { addAccessory, updateAccessory, deleteAccessory } from "@/actions/accessories"
 import type { Accessory } from "@/lib/supabase/types"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -63,9 +73,10 @@ export function AccessoriesClient({ accessories, searchQuery }: AccessoriesClien
     accessories,
     (
       state: Accessory[],
-      action: { type: "add"; item: Accessory } | { type: "update"; item: Accessory }
+      action: { type: "add"; item: Accessory } | { type: "update"; item: Accessory } | { type: "delete"; id: string }
     ) => {
       if (action.type === "add") return [action.item, ...state]
+      if (action.type === "delete") return state.filter((a) => a.id !== action.id)
       return state.map((a) => (a.id === action.item.id ? action.item : a))
     }
   )
@@ -155,6 +166,25 @@ export function AccessoriesClient({ accessories, searchQuery }: AccessoriesClien
     router.refresh()
   }
 
+  // Delete dialog
+  const [deleteTarget, setDeleteTarget] = useState<Accessory | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleteError(null)
+    startTransition(() => {
+      dispatchOptimistic({ type: "delete", id: deleteTarget.id })
+    })
+    const result = await deleteAccessory(deleteTarget.id)
+    if ("error" in result) {
+      setDeleteError(result.error)
+      return
+    }
+    setDeleteTarget(null)
+    router.refresh()
+  }
+
   return (
     <div className="space-y-4">
       {/* Search + Add button */}
@@ -227,16 +257,29 @@ export function AccessoriesClient({ accessories, searchQuery }: AccessoriesClien
                 <TableCell>{formatPrice(acc.purchase_price)}</TableCell>
                 <TableCell>{formatPrice(acc.sale_price)}</TableCell>
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (!acc.id.startsWith("temp-")) openEditDialog(acc)
-                    }}
-                  >
-                    Düzenle
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (!acc.id.startsWith("temp-")) openEditDialog(acc)
+                      }}
+                    >
+                      Düzenle
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (!acc.id.startsWith("temp-")) { setDeleteError(null); setDeleteTarget(acc) }
+                      }}
+                    >
+                      Sil
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))
@@ -388,6 +431,27 @@ export function AccessoriesClient({ accessories, searchQuery }: AccessoriesClien
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aksesuarı Sil</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{[deleteTarget?.brand, deleteTarget?.category].filter(Boolean).join(" / ") || deleteTarget?.barcode}</strong> aksesuarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && <p className="text-sm text-destructive px-1">{deleteError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -108,3 +108,19 @@ export async function updateAccessory(id: string, formData: FormData): Promise<A
   revalidatePath("/accessories")
   return { success: true }
 }
+
+export async function deleteAccessory(id: string): Promise<ActionResult> {
+  const supabase = await createClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from("accessories") as any).delete().eq("id", id)
+
+  if (error) {
+    if (error.code === "23503") {
+      return { error: "Bu aksesuara bağlı satış kayıtları mevcut olduğu için silinemez." }
+    }
+    return { error: "Aksesuar silinirken bir hata oluştu." }
+  }
+
+  revalidatePath("/accessories")
+  return { success: true }
+}

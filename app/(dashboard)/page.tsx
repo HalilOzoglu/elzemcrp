@@ -269,11 +269,19 @@ export default async function DashboardPage() {
               <tbody>
                 {recentSales.map((sale) => (
                   <tr key={sale.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2 text-muted-foreground">{formatDate(sale.sale_date)}</td>
-                    <td className="px-4 py-2 font-medium">{sale.product_name}</td>
-                    <td className="px-4 py-2">{formatCurrency(sale.sale_price)}</td>
                     <td className="px-4 py-2 text-muted-foreground">
-                      {sale.payment_method ? PAYMENT_LABELS[sale.payment_method] ?? sale.payment_method : "—"}
+                      <Link href={`/sales/${sale.id}`} className="block hover:underline">{formatDate(sale.sale_date)}</Link>
+                    </td>
+                    <td className="px-4 py-2 font-medium">
+                      <Link href={`/sales/${sale.id}`} className="block hover:underline">{sale.product_name}</Link>
+                    </td>
+                    <td className="px-4 py-2">
+                      <Link href={`/sales/${sale.id}`} className="block hover:underline">{formatCurrency(sale.sale_price)}</Link>
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground">
+                      <Link href={`/sales/${sale.id}`} className="block hover:underline">
+                        {sale.payment_method ? PAYMENT_LABELS[sale.payment_method] ?? sale.payment_method : "—"}
+                      </Link>
                     </td>
                   </tr>
                 ))}

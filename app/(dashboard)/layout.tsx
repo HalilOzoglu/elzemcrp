@@ -1,27 +1,8 @@
 import { redirect } from "next/navigation"
-import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
 import { SignOutButton } from "@/components/sign-out-button"
 import { KeyboardShortcutsProvider } from "@/components/keyboard-shortcuts-provider"
-import {
-  LayoutDashboard,
-  Smartphone,
-  Package,
-  Users,
-  ShoppingCart,
-  BookOpen,
-  BarChart2,
-} from "lucide-react"
-
-const navLinks = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/devices", label: "Cihazlar", icon: Smartphone },
-  { href: "/accessories", label: "Aksesuarlar", icon: Package },
-  { href: "/contacts", label: "Cariler", icon: Users },
-  { href: "/sales", label: "Satışlar", icon: ShoppingCart },
-  { href: "/catalog", label: "Katalog", icon: BookOpen },
-  { href: "/reports", label: "Raporlar", icon: BarChart2 },
-]
+import { SidebarNav } from "@/components/nav-link"
 
 export default async function DashboardLayout({
   children,
@@ -46,18 +27,7 @@ export default async function DashboardLayout({
           <p className="text-xs text-muted-foreground">POS / ERP</p>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1 p-2">
-          {navLinks.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {label}
-            </Link>
-          ))}
-        </nav>
+        <SidebarNav />
 
         <div className="border-t border-border p-2">
           <SignOutButton />
