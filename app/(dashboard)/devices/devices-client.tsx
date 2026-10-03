@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useOptimistic, useState, useTransition, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
@@ -558,6 +558,15 @@ export function DevicesClient({
     router.refresh()
   }
 
+  // Sorting logic: Brand alphabetical (ascending), Model name descending (numeric-aware).
+  const sortedDevices = [...optimisticDevices].sort((a, b) => {
+    const brandCompare = a.brand.localeCompare(b.brand, "tr")
+    if (brandCompare !== 0) return brandCompare
+    
+    // Model sort reversed (b to a) to list '17 pro max', '16 pro max', '16 pro' correctly.
+    return b.model.localeCompare(a.model, "tr", { numeric: true, sensitivity: 'base' })
+  })
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -640,14 +649,14 @@ export function DevicesClient({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {optimisticDevices.length === 0 ? (
+          {sortedDevices.length === 0 ? (
             <TableRow>
               <TableCell colSpan={8} className="text-center text-muted-foreground">
                 {hasFilters ? "Filtreye uyan cihaz bulunamadı." : "Henüz cihaz eklenmemiş."}
               </TableCell>
             </TableRow>
           ) : (
-            optimisticDevices.map((device) => (
+            sortedDevices.map((device) => (
               <TableRow
                 key={device.device_id}
                 className={`cursor-pointer hover:bg-muted/50 ${device.device_id.startsWith("temp-") ? "opacity-60" : ""}`}
